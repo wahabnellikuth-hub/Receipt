@@ -265,7 +265,7 @@ const App = {
                             <div class="list-item parent-item" data-name="${p.parentName.toLowerCase()}" data-phone="${p.whatsappNumber}">
                                 <div class="list-item-content">
                                     <h3>${p.parentName} ${p.studentName ? `<span style="font-weight: 300; font-size: 0.85em;">(${p.studentName})</span>` : ''}</h3>
-                                    <p>${p.whatsappNumber} • ₹${p.monthlyFee}/mo</p>
+                                    <p>${p.whatsappNumber ? p.whatsappNumber : '<i data-lucide="phone-off" style="width: 14px; height: 14px; color: var(--danger); vertical-align: text-bottom; margin-right: 2px;"></i><span style="color: var(--danger); font-size: 0.9em;">No Phone</span>'} • ₹${p.monthlyFee}/mo</p>
                                 </div>
                                 <div class="flex gap-2" style="align-items: center;">
                                     <button class="btn btn-secondary" style="width: auto; padding: 6px;" onclick="App.editParent('${p.id}')" title="Edit">
@@ -329,12 +329,12 @@ const App = {
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>WhatsApp Number (with country code, e.g. 91XXXXXXXXXX) *</label>
-                    <input type="text" name="whatsappNumber" class="form-control" required>
+                    <label>WhatsApp Number (with country code, e.g. 91XXXXXXXXXX)</label>
+                    <input type="tel" name="whatsappNumber" class="form-control" inputmode="tel">
                 </div>
                 <div class="form-group">
                     <label>Monthly Fee (₹) *</label>
-                    <input type="number" name="monthlyFee" class="form-control" required>
+                    <input type="number" name="monthlyFee" class="form-control" inputmode="numeric" required>
                 </div>
                 <button type="submit" class="btn btn-primary mt-4">Save Parent</button>
             </form>
@@ -396,12 +396,12 @@ const App = {
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>WhatsApp Number *</label>
-                    <input type="text" name="whatsappNumber" class="form-control" value="${parent.whatsappNumber}" required>
+                    <label>WhatsApp Number</label>
+                    <input type="tel" name="whatsappNumber" class="form-control" value="${parent.whatsappNumber}" inputmode="tel">
                 </div>
                 <div class="form-group">
                     <label>Monthly Fee (₹) *</label>
-                    <input type="number" name="monthlyFee" class="form-control" value="${parent.monthlyFee}" required>
+                    <input type="number" name="monthlyFee" class="form-control" value="${parent.monthlyFee}" inputmode="numeric" required>
                 </div>
                 <button type="submit" class="btn btn-primary mt-4">Update Parent</button>
             </form>
@@ -537,7 +537,7 @@ const App = {
             <form id="recordPaymentForm">
                 <div class="form-group">
                     <label>Amount Received (₹)</label>
-                    <input type="number" name="amount" class="form-control" value="${parent.monthlyFee}" required>
+                    <input type="number" name="amount" class="form-control" value="${parent.monthlyFee}" inputmode="numeric" required>
                 </div>
                 <div class="form-group">
                     <label>Payment Method</label>
@@ -591,7 +591,7 @@ const App = {
             <form id="editPaymentForm">
                 <div class="form-group">
                     <label>Amount Received (₹)</label>
-                    <input type="number" name="amount" class="form-control" value="${payment.amount}" required>
+                    <input type="number" name="amount" class="form-control" value="${payment.amount}" inputmode="numeric" required>
                 </div>
                 <div class="form-group">
                     <label>Payment Method</label>
