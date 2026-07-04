@@ -18,7 +18,8 @@
     <link rel="stylesheet" href="css/app.css">
     
     <!-- CDNs -->
-    <script src="https://unpkg.com/dexie@4.0.8/dist/dexie.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -72,12 +73,19 @@
         // Initialize Lucide icons
         lucide.createIcons();
         
-        // Register Service Worker
+        // Register Service Worker and force update
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js').then(reg => {
                     console.log('SW registered:', reg);
+                    // Force update to ensure new sw.js is fetched
+                    reg.update();
                 }).catch(err => console.error('SW Error:', err));
+                
+                // If there's a waiting SW (new version), activate it immediately
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    window.location.reload();
+                });
             });
         }
     </script>

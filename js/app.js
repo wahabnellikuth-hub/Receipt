@@ -197,7 +197,7 @@ const App = {
                             <h4 style="margin: 0; font-size: 1rem;">${item.parent.parentName}</h4>
                             <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">${item.payment.receiptNo} • ₹${item.payment.amount}</p>
                         </div>
-                        <button class="btn" style="width: 40px; height: 40px; padding: 0; border-radius: 50%; background: #25D366; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.4); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="App.generateJPG(${item.payment.id}, true); this.parentElement.style.opacity='0.5';" title="Send Receipt">
+                        <button class="btn" style="width: 40px; height: 40px; padding: 0; border-radius: 50%; background: #25D366; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.4); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="App.generateJPG('${item.payment.id}', true); this.parentElement.style.opacity='0.5';" title="Send Receipt">
                             <i data-lucide="message-circle" style="width: 20px; height: 20px; color: white; margin: 0;"></i>
                         </button>
                     </div>
@@ -218,7 +218,7 @@ const App = {
             const num = i + 1; // 1 to 10
             const isActive = window.currentClassFilter === cls.id;
             iconsHtml += `
-                <div onclick="App.filterByClass(${cls.id})" style="
+                <div onclick="App.filterByClass('${cls.id}')" style="
                     display: flex; flex-direction: column; align-items: center; justify-content: center;
                     aspect-ratio: 1; border-radius: 16px; cursor: pointer; transition: all 0.2s;
                     background: ${isActive ? 'var(--primary-600)' : 'var(--bg-color)'};
@@ -268,10 +268,10 @@ const App = {
                                     <p>${p.whatsappNumber} • ₹${p.monthlyFee}/mo</p>
                                 </div>
                                 <div class="flex gap-2" style="align-items: center;">
-                                    <button class="btn btn-secondary" style="width: auto; padding: 6px;" onclick="App.editParent(${p.id})" title="Edit">
+                                    <button class="btn btn-secondary" style="width: auto; padding: 6px;" onclick="App.editParent('${p.id}')" title="Edit">
                                         <i data-lucide="edit-2" style="margin: 0; width: 16px; height: 16px;"></i>
                                     </button>
-                                    <button class="btn btn-secondary" style="width: auto; padding: 6px; color: var(--danger); border-color: var(--danger);" onclick="App.deleteParent(${p.id})" title="Delete">
+                                    <button class="btn btn-secondary" style="width: auto; padding: 6px; color: var(--danger); border-color: var(--danger);" onclick="App.deleteParent('${p.id}')" title="Delete">
                                         <i data-lucide="trash-2" style="margin: 0; width: 16px; height: 16px;"></i>
                                     </button>
                                 </div>
@@ -348,7 +348,7 @@ const App = {
                     const newId = await db.parents.add({
                         parentName: fd.get('parentName'),
                         studentName: fd.get('studentName'),
-                        classId: Number(fd.get('classId')),
+                        classId: fd.get('classId'),
                         whatsappNumber: fd.get('whatsappNumber'),
                         monthlyFee: Number(fd.get('monthlyFee')),
                         notes: ''
@@ -415,7 +415,7 @@ const App = {
                     await db.parents.update(id, {
                         parentName: fd.get('parentName'),
                         studentName: fd.get('studentName'),
-                        classId: Number(fd.get('classId')),
+                        classId: fd.get('classId'),
                         whatsappNumber: fd.get('whatsappNumber'),
                         monthlyFee: Number(fd.get('monthlyFee'))
                     });
@@ -474,23 +474,23 @@ const App = {
                 const isPaid = p.status === 'Paid';
                 html += `
                     <div class="list-item" style="cursor:pointer">
-                        <div class="list-item-content" onclick="${isPaid ? `App.viewReceipt(${p.id})` : `App.recordPayment(${p.id})`}" style="flex:1">
+                        <div class="list-item-content" onclick="${isPaid ? `App.viewReceipt('${p.id}')` : `App.recordPayment('${p.id}')`}" style="flex:1">
                             <h3>${p.parent.parentName}</h3>
                             <p>${p.className} • ₹${p.parent.monthlyFee}</p>
                         </div>
                         <div class="flex align-center gap-2">
-                            <span class="badge ${isPaid ? 'badge-success' : 'badge-danger'}" onclick="${isPaid ? `App.viewReceipt(${p.id})` : `App.recordPayment(${p.id})`}">${p.status}</span>
+                            <span class="badge ${isPaid ? 'badge-success' : 'badge-danger'}" onclick="${isPaid ? `App.viewReceipt('${p.id}')` : `App.recordPayment('${p.id}')`}">${p.status}</span>
                             ${isPaid ? `
                             <div class="flex gap-1">
-                                <button class="btn btn-secondary" style="width: auto; padding: 6px;" onclick="event.stopPropagation(); App.editPayment(${p.id})" title="Edit Payment">
+                                <button class="btn btn-secondary" style="width: auto; padding: 6px;" onclick="event.stopPropagation(); App.editPayment('${p.id}')" title="Edit Payment">
                                     <i data-lucide="edit-2" style="margin: 0; width: 16px; height: 16px;"></i>
                                 </button>
-                                <button class="btn btn-secondary" style="width: auto; padding: 6px; border-color: var(--danger); color: var(--danger);" onclick="event.stopPropagation(); App.undoPayment(${p.id})" title="Mark as Unpaid">
+                                <button class="btn btn-secondary" style="width: auto; padding: 6px; border-color: var(--danger); color: var(--danger);" onclick="event.stopPropagation(); App.undoPayment('${p.id}')" title="Mark as Unpaid">
                                     <i data-lucide="undo" style="margin: 0; width: 16px; height: 16px;"></i>
                                 </button>
                             </div>
                             ` : ''}
-                            <i data-lucide="chevron-right" style="color: var(--text-muted); width: 16px;" onclick="${isPaid ? `App.viewReceipt(${p.id})` : `App.recordPayment(${p.id})`}"></i>
+                            <i data-lucide="chevron-right" style="color: var(--text-muted); width: 16px;" onclick="${isPaid ? `App.viewReceipt('${p.id}')` : `App.recordPayment('${p.id}')`}"></i>
                         </div>
                     </div>
                 `;
@@ -697,13 +697,13 @@ const App = {
             </div>
             
             <div class="flex gap-4" style="flex-direction: column;">
-                <button class="btn btn-primary" onclick="App.generateJPG(${paymentId}, true)">
+                <button class="btn btn-primary" onclick="App.generateJPG('${paymentId}', true)">
                     <i data-lucide="share-2"></i> Send via WhatsApp
                 </button>
-                <button class="btn btn-secondary" onclick="App.generateJPG(${paymentId}, false)">
+                <button class="btn btn-secondary" onclick="App.generateJPG('${paymentId}', false)">
                     <i data-lucide="download"></i> Download JPG
                 </button>
-                <button class="btn" style="border: 1px solid var(--danger); color: var(--danger); background: transparent;" onclick="App.undoPayment(${paymentId})">
+                <button class="btn" style="border: 1px solid var(--danger); color: var(--danger); background: transparent;" onclick="App.undoPayment('${paymentId}')">
                     <i data-lucide="undo"></i> Undo Payment
                 </button>
                 <button class="btn btn-secondary" id="backToPaymentsBtn" style="border-color: var(--text-muted); color: var(--text-main);">
@@ -780,6 +780,12 @@ const App = {
                 
                 const w = canvas.width;
                 const h = canvas.height;
+                
+                // Clear old dummy text using white boxes
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(w * 0.43, h * 0.29, w * 0.4, h * 0.05); // Receipt No
+                ctx.fillRect(w * 0.51, h * 0.44, w * 0.45, h * 0.40); // Details
+                
                 const fontSize = w * 0.024;
                 ctx.font = `600 ${fontSize}px "Outfit", sans-serif`;
                 ctx.fillStyle = '#0f172a';
