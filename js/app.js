@@ -767,7 +767,7 @@ const App = {
             const parent = await db.parents.get(payment.parentId);
             const cls = await db.classes.get(parent.classId);
             
-            const templateSrc = 'receipt-template.png';
+            const templateSrc = 'receipt-template.jpg';
             const img = new Image();
             
             img.onload = () => {
@@ -780,12 +780,6 @@ const App = {
                 
                 const w = canvas.width;
                 const h = canvas.height;
-                
-                // Clear old dummy text using white boxes
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(w * 0.43, h * 0.29, w * 0.4, h * 0.05); // Receipt No
-                ctx.fillRect(w * 0.51, h * 0.44, w * 0.45, h * 0.40); // Details
-                
                 const fontSize = w * 0.024;
                 ctx.font = `600 ${fontSize}px "Outfit", sans-serif`;
                 ctx.fillStyle = '#0f172a';
