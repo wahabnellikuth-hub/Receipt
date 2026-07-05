@@ -1,4 +1,4 @@
-const CACHE_NAME = 'madrassa-fee-v23';
+const CACHE_NAME = 'madrassa-fee-v26';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',

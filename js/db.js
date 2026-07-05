@@ -116,6 +116,16 @@ const db = {
             });
             await database.ref('payments').update(updates);
         }
+    },
+
+    settings: {
+        get: async (key) => {
+            const snap = await database.ref(`settings/${key}`).once('value');
+            return snap.val();
+        },
+        set: async (key, value) => {
+            await database.ref(`settings/${key}`).set(value);
+        }
     }
 };
 

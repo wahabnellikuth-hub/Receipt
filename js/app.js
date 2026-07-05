@@ -245,7 +245,7 @@ const App = {
         UI.openModal('Pending Receipts', content);
     },
 
-    openReceiptSettingsModal() {
+    async openReceiptSettingsModal() {
         // Load existing settings
         let settings = {
             prefix: '',
@@ -253,12 +253,22 @@ const App = {
             startX: 0.52,
             nameY: 0.473, monthY: 0.527, amountY: 0.582, wordsY: 0.638,
             dateY: 0.693, methodY: 0.748, remarksY: 0.803,
-            template: 'receipt-template.jpg'
+            template: 'receipt-template.png'
         };
-        try {
-            const saved = localStorage.getItem('receiptSettings');
-            if(saved) settings = { ...settings, ...JSON.parse(saved) };
-        } catch(e) {}
+        
+        let globalSaved = await db.settings.get('receiptSettings');
+        if (!globalSaved) {
+            // Migrate from local storage if global is empty
+            try {
+                const localSaved = localStorage.getItem('receiptSettings');
+                if(localSaved) {
+                    globalSaved = JSON.parse(localSaved);
+                    await db.settings.set('receiptSettings', globalSaved);
+                }
+            } catch(e) {}
+        }
+        
+        if (globalSaved) settings = { ...settings, ...globalSaved };
 
         const content = `
             <form id="receiptSettingsForm">
@@ -355,7 +365,7 @@ const App = {
                 }
             });
 
-            form.addEventListener('submit', (e) => {
+            form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const fd = new FormData(e.target);
                 const newSettings = {
@@ -371,17 +381,22 @@ const App = {
                     remarksY: Number(fd.get('remarksY')),
                     template: base64Template
                 };
+                
+                // Save globally to Firebase and locally for fallback
+                await db.settings.set('receiptSettings', newSettings);
                 localStorage.setItem('receiptSettings', JSON.stringify(newSettings));
-                UI.showToast('Receipt settings saved!');
+                
+                UI.showToast('Receipt settings updated globally!');
                 closeFunc();
             });
         });
     },
 
-    resetReceiptSettings() {
-        if(confirm('Reset all receipt settings to defaults?')) {
+    async resetReceiptSettings() {
+        if(confirm('Reset all receipt settings to defaults globally?')) {
+            await db.settings.set('receiptSettings', null);
             localStorage.removeItem('receiptSettings');
-            UI.showToast('Settings reset. Please reopen modal.');
+            UI.showToast('Settings reset globally. Please reopen modal.');
             const closeBtn = document.querySelector('.close-btn');
             if(closeBtn) closeBtn.click();
         }
@@ -1012,9 +1027,17 @@ const App = {
                 dateY: 0.693, methodY: 0.748, remarksY: 0.803,
                 template: 'receipt-template.png'
             };
+            
             try {
-                const saved = localStorage.getItem('receiptSettings');
-                if(saved) settings = { ...settings, ...JSON.parse(saved) };
+                let globalSaved = await db.settings.get('receiptSettings');
+                if (!globalSaved) {
+                    const localSaved = localStorage.getItem('receiptSettings');
+                    if(localSaved) {
+                        globalSaved = JSON.parse(localSaved);
+                        await db.settings.set('receiptSettings', globalSaved);
+                    }
+                }
+                if(globalSaved) settings = { ...settings, ...globalSaved };
             } catch(e) {}
             
             const templateSrc = settings.template;
@@ -1091,6 +1114,99 @@ const App = {
         }
     },
 
+    async exportReceiptsPDF() {
+        try {
+            const currentMonth = getActiveMonth();
+            const payments = await db.payments.where('month').equals(currentMonth).toArray();
+            const paidPayments = payments.filter(p => p.status === 'Paid' && p.receiptNo);
+
+            if (paidPayments.length === 0) {
+                UI.showToast('No paid receipts found for this month.', 'info');
+                return;
+            }
+
+            // Sort by receipt number numerically
+            paidPayments.sort((a, b) => {
+                const numA = parseInt(a.receiptNo.replace(/\D/g, '')) || 0;
+                const numB = parseInt(b.receiptNo.replace(/\D/g, '')) || 0;
+                return numA - numB;
+            });
+
+            UI.showToast(`Generating PDF for ${paidPayments.length} receipts... Please wait.`);
+
+            let settings = {
+                receiptNoX: 0.44, receiptNoY: 0.323,
+                startX: 0.52,
+                nameY: 0.473, monthY: 0.527, amountY: 0.582, wordsY: 0.638,
+                dateY: 0.693, methodY: 0.748, remarksY: 0.803,
+                template: 'receipt-template.png'
+            };
+            
+            try {
+                let globalSaved = await db.settings.get('receiptSettings');
+                if(globalSaved) settings = { ...settings, ...globalSaved };
+            } catch(e) {}
+            
+            const templateSrc = settings.template;
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+
+            img.onload = async () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                
+                const orientation = img.width > img.height ? 'landscape' : 'portrait';
+                const pdf = new window.jspdf.jsPDF(orientation, 'px', [img.width, img.height]);
+
+                for (let i = 0; i < paidPayments.length; i++) {
+                    const payment = paidPayments[i];
+                    const parent = await db.parents.get(payment.parentId);
+                    
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    const w = canvas.width;
+                    const h = canvas.height;
+                    const fontSize = w * 0.024;
+                    ctx.font = `600 ${fontSize}px "Outfit", sans-serif`;
+                    ctx.textAlign = 'left';
+                    
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fillText(payment.receiptNo, w * settings.receiptNoX, h * settings.receiptNoY);
+                    
+                    const startX = w * settings.startX;
+                    const lines = [
+                        { y: settings.nameY, text: parent.parentName },
+                        { y: settings.monthY, text: formatMonthYear(payment.month) },
+                        { y: settings.amountY, text: `Rs. ${payment.amount}/-` },
+                        { y: settings.wordsY, text: App.amountToWords(payment.amount) },
+                        { y: settings.dateY, text: formatDate(payment.date) },
+                        { y: settings.methodY, text: payment.method },
+                        { y: settings.remarksY, text: payment.remarks || 'Jazakkallah', isRemarks: true }
+                    ];
+                    
+                    lines.forEach(line => {
+                        ctx.fillStyle = line.isRemarks ? '#16a34a' : '#0f172a';
+                        ctx.fillText(line.text, startX, h * line.y);
+                    });
+                    
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                    
+                    if (i > 0) pdf.addPage([img.width, img.height], orientation);
+                    pdf.addImage(dataUrl, 'JPEG', 0, 0, img.width, img.height);
+                }
+                
+                pdf.save(`Receipts_${currentMonth}.pdf`);
+                UI.showToast('PDF Export Complete!');
+            };
+            img.src = templateSrc;
+        } catch(e) {
+            UI.showToast(e.message, 'error');
+        }
+    },
+
     amountToWords(num) {
         if(num === 0) return 'Zero Only';
         const a = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
@@ -1129,14 +1245,17 @@ const App = {
 
             <div class="card mt-4">
                 <h3>Reports & Exports</h3>
-                <p class="text-muted mb-4">Download comprehensive reports in XLSX format.</p>
+                <p class="text-muted mb-4">Download comprehensive reports in XLSX or PDF format.</p>
                 
                 <div class="flex gap-4" style="flex-direction: column;">
                     <button class="btn btn-secondary" onclick="App.exportParents()">
-                        <i data-lucide="users"></i> Export All Parents
+                        <i data-lucide="users"></i> Export All Parents (Excel)
                     </button>
                     <button class="btn btn-secondary" onclick="App.openExportPaymentsModal()">
-                        <i data-lucide="receipt"></i> Export This Month Payments
+                        <i data-lucide="table"></i> Export This Month Payments (Excel)
+                    </button>
+                    <button class="btn btn-secondary" style="background: var(--primary-600); color: white; border: none;" onclick="App.exportReceiptsPDF()">
+                        <i data-lucide="file-down"></i> Export All Receipts PDF (Current Month)
                     </button>
                 </div>
             </div>
