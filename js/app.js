@@ -429,25 +429,6 @@ const App = {
         const classes = await db.classes.toArray();
         const parents = await db.parents.toArray();
         
-        let iconsHtml = `<div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px;">`;
-        classes.forEach((cls, i) => {
-            const num = i + 1; // 1 to 10
-            const isActive = window.currentClassFilter === cls.id;
-            iconsHtml += `
-                <div onclick="App.filterByClass('${cls.id}')" style="
-                    display: flex; flex-direction: column; align-items: center; justify-content: center;
-                    aspect-ratio: 1; border-radius: 16px; cursor: pointer; transition: all 0.2s;
-                    background: ${isActive ? 'var(--primary-600)' : 'var(--bg-color)'};
-                    color: ${isActive ? 'white' : 'var(--text-color)'};
-                    border: 1px solid ${isActive ? 'var(--primary-600)' : 'var(--border-color)'};
-                    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-                ">
-                    <span style="font-size: 1.5rem; font-weight: 700;">${num}</span>
-                </div>
-            `;
-        });
-        iconsHtml += `</div>`;
-        
         let html = `
             <div style="margin-bottom: 20px; text-align: center;">
                 <h2 style="margin-bottom: 16px;">Parents Directory</h2>
@@ -455,8 +436,6 @@ const App = {
                     <i data-lucide="user-plus"></i> Add Parent
                 </button>
             </div>
-            
-            ${iconsHtml}
             
             <div class="form-group">
                 <input type="text" id="parentSearch" class="form-control" placeholder="Search by name or number..." onkeyup="App.filterParents()">
@@ -469,33 +448,25 @@ const App = {
         if (parents.length === 0) {
             html += `<p class="text-center text-muted">No parents added yet.</p>`;
         } else {
-            // Group by class
-            for (const cls of classes) {
-                if (window.currentClassFilter && window.currentClassFilter !== cls.id) continue;
-                
-                const classParents = parents.filter(p => p.classId === cls.id);
-                if (classParents.length > 0) {
-                    html += `<h4 class="mt-4 mb-2" style="color: var(--primary-600); border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">${cls.name}</h4>`;
-                    classParents.forEach(p => {
-                        html += `
-                            <div class="list-item parent-item" data-name="${p.parentName.toLowerCase()}" data-phone="${p.whatsappNumber}">
-                                <div class="list-item-content">
-                                    <h3>${p.parentName} ${p.studentName ? `<span style="font-weight: 300; font-size: 0.85em;">(${p.studentName})</span>` : ''}</h3>
-                                    <p>${p.whatsappNumber ? p.whatsappNumber : '<i data-lucide="phone-off" style="width: 14px; height: 14px; color: var(--danger); vertical-align: text-bottom; margin-right: 2px;"></i><span style="color: var(--danger); font-size: 0.9em;">No Phone</span>'} • ₹${p.monthlyFee}/mo</p>
-                                </div>
-                                <div class="flex gap-2" style="align-items: center;">
-                                    <button class="btn btn-secondary" style="width: auto; padding: 6px;" onclick="App.editParent('${p.id}')" title="Edit">
-                                        <i data-lucide="edit-2" style="margin: 0; width: 16px; height: 16px;"></i>
-                                    </button>
-                                    <button class="btn btn-secondary" style="width: auto; padding: 6px; color: var(--danger); border-color: var(--danger);" onclick="App.deleteParent('${p.id}')" title="Delete">
-                                        <i data-lucide="trash-2" style="margin: 0; width: 16px; height: 16px;"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                    });
-                }
-            }
+            // Display parents in the order they were added
+            parents.forEach((p, index) => {
+                html += `
+                    <div class="list-item parent-item" data-name="${p.parentName.toLowerCase()}" data-phone="${p.whatsappNumber}">
+                        <div class="list-item-content">
+                            <h3>${index + 1}. ${p.parentName} ${p.studentName ? `<span style="font-weight: 300; font-size: 0.85em;">(${p.studentName})</span>` : ''}</h3>
+                            <p>${p.whatsappNumber ? p.whatsappNumber : '<i data-lucide="phone-off" style="width: 14px; height: 14px; color: var(--danger); vertical-align: text-bottom; margin-right: 2px;"></i><span style="color: var(--danger); font-size: 0.9em;">No Phone</span>'} • ₹${p.monthlyFee}/mo</p>
+                        </div>
+                        <div class="flex gap-2" style="align-items: center;">
+                            <button class="btn btn-secondary" style="width: auto; padding: 6px;" onclick="App.editParent('${p.id}')" title="Edit">
+                                <i data-lucide="edit-2" style="margin: 0; width: 16px; height: 16px;"></i>
+                            </button>
+                            <button class="btn btn-secondary" style="width: auto; padding: 6px; color: var(--danger); border-color: var(--danger);" onclick="App.deleteParent('${p.id}')" title="Delete">
+                                <i data-lucide="trash-2" style="margin: 0; width: 16px; height: 16px;"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
         }
         
         html += `</div></div>`;
@@ -669,43 +640,21 @@ const App = {
         const parents = await db.parents.toArray();
         const classes = await db.classes.toArray();
         
-        // Map data
-        const enriched = payments.map(pay => {
-            const parent = parents.find(p => p.id === pay.parentId) || {};
+        // Map data to match order of adding parents
+        const enriched = parents.map((parent, index) => {
+            const pay = payments.find(p => p.parentId === parent.id);
+            if (!pay) return null;
             const cls = classes.find(c => c.id === parent.classId) || {};
-            return { ...pay, parent, className: cls.name };
-        }).filter(p => p.parent.id); // Valid ones
+            return { ...pay, parent, className: cls.name, serialNo: index + 1 };
+        }).filter(p => p !== null);
         
         // State for filters
         window.currentPaymentFilter = window.currentPaymentFilter || 'Pending';
-
-        let iconsHtml = `<div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px;">`;
-        classes.forEach((cls, i) => {
-            const num = i + 1; // 1 to 10
-            const isActive = window.currentPaymentClassFilter === cls.id;
-            iconsHtml += `
-                <div onclick="App.filterPaymentByClass('${cls.id}')" style="
-                    display: flex; flex-direction: column; align-items: center; justify-content: center;
-                    aspect-ratio: 1; border-radius: 16px; cursor: pointer; transition: all 0.2s;
-                    background: ${isActive ? 'var(--primary-600)' : 'var(--bg-color)'};
-                    color: ${isActive ? 'white' : 'var(--text-color)'};
-                    border: 1px solid ${isActive ? 'var(--primary-600)' : 'var(--border-color)'};
-                    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-                ">
-                    <span style="font-size: 1.5rem; font-weight: 700;">${num}</span>
-                </div>
-            `;
-        });
-        iconsHtml += `</div>`;
         
         const renderList = (filter) => {
             window.currentPaymentFilter = filter;
             const filtered = enriched.filter(p => {
-                let match = filter === 'All' || p.status === filter;
-                if(window.currentPaymentClassFilter) {
-                    match = match && (p.parent.classId === window.currentPaymentClassFilter);
-                }
-                return match;
+                return filter === 'All' || p.status === filter;
             });
             
             let html = '';
@@ -716,7 +665,7 @@ const App = {
                 html += `
                     <div class="list-item payment-item" data-name="${(p.parent.parentName || '').toLowerCase()}" data-phone="${p.parent.whatsappNumber || ''}" style="cursor:pointer">
                         <div class="list-item-content" onclick="${isPaid ? `App.viewReceipt('${p.id}')` : `App.recordPayment('${p.id}')`}" style="flex:1">
-                            <h3>${p.parent.parentName}</h3>
+                            <h3>${p.serialNo}. ${p.parent.parentName}</h3>
                             <p>${p.className} • ₹${p.parent.monthlyFee}</p>
                         </div>
                         <div class="flex align-center gap-2">
@@ -758,8 +707,6 @@ const App = {
         
         container.innerHTML = `
             <h2 style="text-align: center; margin-bottom: 16px;">Payments (${formatMonthYear(currentMonth)})</h2>
-            
-            ${iconsHtml}
             
             <div class="form-group">
                 <input type="text" id="paymentSearch" class="form-control" placeholder="Search by name or number..." onkeyup="App.filterPaymentsSearch()">
@@ -1106,15 +1053,36 @@ const App = {
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
                 
                 if(sendViaWhatsapp) {
-                    const link = document.createElement('a');
-                    link.href = dataUrl;
-                    link.download = `${payment.receiptNo}.jpg`;
-                    link.click();
-                    UI.showToast("JPG downloaded. Opening WhatsApp...");
-                    setTimeout(() => {
-                        const msg = encodeURIComponent(`Assalamu Alaikum.\n\nPlease find attached/below the fee receipt *${payment.receiptNo}* for ${payment.month}.\nAmount Paid: ₹${payment.amount}\n\nJazakumullahu Khair.`);
-                        window.open(`https://wa.me/${parent.whatsappNumber}?text=${msg}`, '_blank');
-                    }, 1000);
+                    const msgText = `Assalamu Alaikum.\n\nPlease find attached/below the fee receipt *${payment.receiptNo}* for ${payment.month}.\nAmount Paid: ₹${payment.amount}\n\nJazakumullahu Khair.`;
+                    
+                    fetch(dataUrl)
+                        .then(res => res.blob())
+                        .then(async (blob) => {
+                            const file = new File([blob], `${payment.receiptNo}.jpg`, { type: 'image/jpeg' });
+                            
+                            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                                try {
+                                    await navigator.share({
+                                        title: 'Fee Receipt',
+                                        text: msgText,
+                                        files: [file]
+                                    });
+                                    UI.showToast("Shared via WhatsApp successfully");
+                                } catch (error) {
+                                    console.log('Share failed or cancelled', error);
+                                }
+                            } else {
+                                // Fallback for Desktop: download and open wa.me
+                                const link = document.createElement('a');
+                                link.href = dataUrl;
+                                link.download = `${payment.receiptNo}.jpg`;
+                                link.click();
+                                UI.showToast("JPG downloaded. Opening WhatsApp...");
+                                setTimeout(() => {
+                                    window.open(`https://wa.me/${parent.whatsappNumber}?text=${encodeURIComponent(msgText)}`, '_blank');
+                                }, 1000);
+                            }
+                        });
                 } else {
                     const link = document.createElement('a');
                     link.href = dataUrl;
