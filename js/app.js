@@ -1109,34 +1109,25 @@ const App = {
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
                 
                 if(sendViaWhatsapp) {
-                    const msgText = `Assalamu Alaikum.\n\nPlease find attached/below the fee receipt *${payment.receiptNo}* for ${payment.month}.\nAmount Paid: ₹${payment.amount}\n\nJazakumullahu Khair.`;
-                    
+                    UI.showToast("Uploading receipt to cloud...", "info");
                     fetch(dataUrl)
                         .then(res => res.blob())
                         .then(async (blob) => {
-                            const file = new File([blob], `${payment.receiptNo}.jpg`, { type: 'image/jpeg' });
-                            
-                            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                                try {
-                                    await navigator.share({
-                                        title: 'Fee Receipt',
-                                        text: msgText,
-                                        files: [file]
-                                    });
-                                    UI.showToast("Shared via WhatsApp successfully");
-                                } catch (error) {
-                                    console.log('Share failed or cancelled', error);
-                                }
-                            } else {
-                                // Fallback for Desktop: download and open wa.me
-                                const link = document.createElement('a');
-                                link.href = dataUrl;
-                                link.download = `${payment.receiptNo}.jpg`;
-                                link.click();
-                                UI.showToast("JPG downloaded. Opening WhatsApp...");
-                                setTimeout(() => {
-                                    window.open(`https://wa.me/${parent.whatsappNumber}?text=${encodeURIComponent(msgText)}`, '_blank');
-                                }, 1000);
+                            try {
+                                const storageRef = firebase.storage().ref(`receipts/${payment.receiptNo}.jpg`);
+                                await storageRef.put(blob);
+                                const downloadURL = await storageRef.getDownloadURL();
+                                
+                                const msgText = `*Name:* ${parent.parentName}\n*Amount:* ${payment.amount}\n*Month:* ${formatMonthYear(payment.month)}\n*Receipt No:* ${payment.receiptNo}\n\n*Successfully Received.*\n\nView Receipt: ${downloadURL}`;
+                                
+                                window.open(`https://wa.me/${parent.whatsappNumber}?text=${encodeURIComponent(msgText)}`, '_blank');
+                                UI.showToast("Opening WhatsApp...");
+                            } catch (error) {
+                                console.error('Upload failed', error);
+                                UI.showToast("Cloud upload failed. Using text only.", "error");
+                                
+                                const msgText = `*Name:* ${parent.parentName}\n*Amount:* ${payment.amount}\n*Month:* ${formatMonthYear(payment.month)}\n*Receipt No:* ${payment.receiptNo}\n\n*Successfully Received.*`;
+                                window.open(`https://wa.me/${parent.whatsappNumber}?text=${encodeURIComponent(msgText)}`, '_blank');
                             }
                         });
                 } else {
