@@ -70,7 +70,19 @@ const App = {
         
         const unsentMessages = paid.filter(p => !p.textSent || !p.receiptSent);
         
-        const collectedAmount = paid.reduce((sum, p) => sum + Number(p.amount), 0);
+        let collectedBase = 0;
+        let collectedAdvance = 0;
+        for (let p of paid) {
+            const parent = await db.parents.get(p.parentId);
+            const fee = parent ? Number(parent.monthlyFee) : 0;
+            const amt = Number(p.amount);
+            if (amt > fee && fee > 0) {
+                collectedBase += fee;
+                collectedAdvance += (amt - fee);
+            } else {
+                collectedBase += amt;
+            }
+        }
         
         // We need parent info to calculate pending amount accurately (monthlyFee)
         let pendingAmount = 0;
@@ -127,7 +139,7 @@ const App = {
             <div class="metrics-grid">
                 <div class="metric-card">
                     <p>Collected</p>
-                    <div class="metric-value">₹${collectedAmount}</div>
+                    <div class="metric-value">₹${collectedBase}${collectedAdvance > 0 ? ` <span style="font-size: 0.6em; opacity: 0.8; font-weight: 500;">(+₹${collectedAdvance})</span>` : ''}</div>
                 </div>
                 <div class="metric-card outline">
                     <p>Pending</p>
@@ -305,7 +317,7 @@ const App = {
                 </div>
                 <h4 style="margin-top: 16px; margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">Receipt Sequence</h4>
                 <div class="metrics-grid" style="grid-template-columns: 1fr; gap: 8px;">
-                    <div class="form-group"><label>Next Number</label><input type="number" name="nextReceiptNumber" class="form-control no-arrows" value="${settings.nextReceiptNumber}"></div>
+                    <div class="form-group"><label>Next Number</label><input type="number" name="nextReceiptNumber" class="form-control" value="${settings.nextReceiptNumber}"></div>
                 </div>
                 <h4 style="margin-top: 16px; margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">Text Positions (Multiplier 0.0 - 1.0)</h4>
                 <div class="metrics-grid" style="grid-template-columns: 1fr 1fr; gap: 8px;">
@@ -840,12 +852,16 @@ const App = {
                 <div class="form-group">
                     <label>Receipt Number</label>
                     <div style="display: flex; gap: 8px; align-items: center;">
-                        <input type="number" name="receiptNumber" class="form-control no-arrows" style="flex: 1;" value="${settings.nextReceiptNumber || 1}" inputmode="numeric" required>
+                        <input type="number" name="receiptNumber" class="form-control" style="flex: 1;" value="${settings.nextReceiptNumber || 1}" inputmode="numeric" required>
                     </div>
                 </div>
                 <div class="form-group">
+                    <label>Number of Months Paid</label>
+                    <input type="number" id="monthsPaid" name="monthsPaid" class="form-control" value="1" min="1" max="12" inputmode="numeric" required oninput="document.getElementById('amountInput').value = this.value * ${parent.monthlyFee}">
+                </div>
+                <div class="form-group">
                     <label>Amount Received (₹)</label>
-                    <input type="number" name="amount" class="form-control" value="${parent.monthlyFee}" inputmode="numeric" required>
+                    <input type="number" id="amountInput" name="amount" class="form-control" value="${parent.monthlyFee}" inputmode="numeric" required>
                 </div>
                 <div class="form-group">
                     <label>Payment Method</label>
@@ -871,20 +887,69 @@ const App = {
                 try {
                     const num = fd.get('receiptNumber');
                     const receiptNo = `${num}`;
+                    const monthsPaid = Number(fd.get('monthsPaid')) || 1;
+                    const totalAmount = Number(fd.get('amount'));
                     
                     settings.nextReceiptNumber = Number(num) + 1;
                     await db.settings.set('receiptSettings', settings);
                     localStorage.setItem('receiptSettings', JSON.stringify(settings));
+                    
+                    let receiptMonthText = formatMonthYear(payment.month);
+                    if (monthsPaid > 1) {
+                        let [y, m] = payment.month.split('-').map(Number);
+                        let endY = y;
+                        let endM = m + monthsPaid - 1;
+                        while (endM > 12) { endM -= 12; endY++; }
+                        receiptMonthText = `${formatMonthYear(payment.month)} - ${formatMonthYear(`${endY}-${String(endM).padStart(2, '0')}`)}`;
+                    }
 
                     await db.payments.update(paymentId, {
                         status: 'Paid',
-                        amount: Number(fd.get('amount')),
+                        amount: totalAmount,
                         method: fd.get('method'),
                         date: fd.get('date'),
                         receiptNo: receiptNo,
                         textSent: false,
-                        receiptSent: false
+                        receiptSent: false,
+                        receiptMonthOverride: monthsPaid > 1 ? receiptMonthText : null
                     });
+                    
+                    if (monthsPaid > 1) {
+                        for (let i = 1; i < monthsPaid; i++) {
+                            let [y, m] = payment.month.split('-').map(Number);
+                            m += i;
+                            while (m > 12) { m -= 12; y++; }
+                            const futureMonth = `${y}-${String(m).padStart(2, '0')}`;
+                            
+                            const existing = await db.payments.where('month').equals(futureMonth).toArray();
+                            const existingForParent = existing.find(p => p.parentId === payment.parentId);
+                            
+                            if (existingForParent) {
+                                await db.payments.update(existingForParent.id, {
+                                    status: 'Paid',
+                                    amount: 0,
+                                    method: fd.get('method'),
+                                    date: fd.get('date'),
+                                    receiptNo: receiptNo,
+                                    textSent: true,
+                                    receiptSent: true
+                                });
+                            } else {
+                                await db.payments.add({
+                                    parentId: payment.parentId,
+                                    month: futureMonth,
+                                    status: 'Paid',
+                                    amount: 0,
+                                    method: fd.get('method'),
+                                    date: fd.get('date'),
+                                    receiptNo: receiptNo,
+                                    remarks: 'Advance Payment',
+                                    textSent: true,
+                                    receiptSent: true
+                                });
+                            }
+                        }
+                    }
                     
                     UI.showToast('Payment recorded successfully');
                     closeFunc();
@@ -1004,7 +1069,7 @@ const App = {
                     ctx.fillStyle = '#0f172a'; ctx.textAlign = 'left';
                     ctx.fillText(payment.receiptNo, w * settings.receiptNoX, h * settings.receiptNoY);
                     const lines = [
-                        { y: settings.nameY, text: parent.parentName }, { y: settings.monthY, text: formatMonthYear(payment.month) },
+                        { y: settings.nameY, text: parent.parentName }, { y: settings.monthY, text: payment.receiptMonthOverride || formatMonthYear(payment.month) },
                         { y: settings.amountY, text: `Rs. ${payment.amount}/-` }, { y: settings.wordsY, text: App.amountToWords(payment.amount) },
                         { y: settings.dateY, text: formatDate(payment.date) }, { y: settings.methodY, text: payment.method },
                         { y: settings.remarksY, text: payment.remarks || 'Jazakkallah', isRemarks: true }
@@ -1061,7 +1126,7 @@ const App = {
                 </div>
                 <div class="flex justify-between" style="text-align: left; font-size: 0.9em; margin-bottom: 8px;">
                     <span>Month:</span>
-                    <strong>${payment.month}</strong>
+                    <strong>${payment.receiptMonthOverride || formatMonthYear(payment.month)}</strong>
                 </div>
                 <hr style="border: none; border-top: 1px dashed var(--border-color); margin: 12px 0;">
                 <div class="flex justify-between" style="text-align: left; font-size: 1.1em; color: var(--success);">
@@ -1229,7 +1294,7 @@ const App = {
                 const startX = w * settings.startX;
                 const lines = [
                     { y: settings.nameY, text: parent.parentName },
-                    { y: settings.monthY, text: formatMonthYear(payment.month) },
+                    { y: settings.monthY, text: payment.receiptMonthOverride || formatMonthYear(payment.month) },
                     { y: settings.amountY, text: `Rs. ${payment.amount}/-` },
                     { y: settings.wordsY, text: App.amountToWords(payment.amount) },
                     { y: settings.dateY, text: formatDate(payment.date) },
@@ -1332,7 +1397,7 @@ const App = {
                     const startX = w * settings.startX;
                     const lines = [
                         { y: settings.nameY, text: parent.parentName },
-                        { y: settings.monthY, text: formatMonthYear(payment.month) },
+                        { y: settings.monthY, text: payment.receiptMonthOverride || formatMonthYear(payment.month) },
                         { y: settings.amountY, text: `Rs. ${payment.amount}/-` },
                         { y: settings.wordsY, text: App.amountToWords(payment.amount) },
                         { y: settings.dateY, text: formatDate(payment.date) },
@@ -1578,6 +1643,8 @@ const App = {
         let settings = {
             template: '',
             dateRaw: defaultRaw,
+            chartX: 0.5, chartY: 0.65, chartScale: 1.0,
+            boxX: 0.5, boxY: 0.1,
             dateX: 0.5, dateY: 0.9,
             paidColor: '#16a34a', pendingColor: '#ef4444'
         };
@@ -1594,16 +1661,26 @@ const App = {
             <form id="posterSettingsForm">
                 <div class="form-group">
                     <label>Poster Template Image</label>
-                    <input type="file" id="posterTemplateUpload" accept="image/png, image/jpeg" class="form-control" style="padding: 4px;">
+                    <div style="display: flex; gap: 8px;">
+                        <input type="file" id="posterTemplateUpload" accept="image/png, image/jpeg" class="form-control" style="padding: 4px; flex: 1;">
+                        <button type="button" class="btn btn-secondary" id="clearPosterBtn" title="Clear Image" style="width: auto; padding: 0 12px; border-color: var(--danger); color: var(--danger);">
+                            <i data-lucide="trash-2" style="margin: 0; width: 18px; height: 18px;"></i>
+                        </button>
+                    </div>
                 </div>
-                <h4 style="margin-top: 16px; margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">Date Text Alignment (Multiplier 0.0 - 1.0)</h4>
+                <h4 style="margin-top: 16px; margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">Alignment Settings (Multiplier 0.0 - 1.0)</h4>
                 <div class="form-group">
                     <label>Date & Time</label>
                     <input type="datetime-local" name="dateRaw" class="form-control" value="${settings.dateRaw}">
                 </div>
                 <div class="metrics-grid" style="grid-template-columns: 1fr 1fr; gap: 8px;">
-                    <div class="form-group"><label>Date Text X</label><input type="number" step="0.01" name="dateX" class="form-control no-arrows" value="${settings.dateX}"></div>
-                    <div class="form-group"><label>Date Text Y</label><input type="number" step="0.01" name="dateY" class="form-control no-arrows" value="${settings.dateY}"></div>
+                    <div class="form-group"><label>Chart Group X</label><input type="number" step="0.01" name="chartX" class="form-control" value="${settings.chartX}"></div>
+                    <div class="form-group"><label>Chart Group Y</label><input type="number" step="0.01" name="chartY" class="form-control" value="${settings.chartY}"></div>
+                    <div class="form-group" style="grid-column: span 2;"><label>Chart Size Scale (1.0 is default)</label><input type="number" step="0.05" name="chartScale" class="form-control" value="${settings.chartScale}"></div>
+                    <div class="form-group"><label>Month Title X</label><input type="number" step="0.01" name="boxX" class="form-control" value="${settings.boxX}"></div>
+                    <div class="form-group"><label>Month Title Y</label><input type="number" step="0.01" name="boxY" class="form-control" value="${settings.boxY}"></div>
+                    <div class="form-group"><label>Date Text X</label><input type="number" step="0.01" name="dateX" class="form-control" value="${settings.dateX}"></div>
+                    <div class="form-group"><label>Date Text Y</label><input type="number" step="0.01" name="dateY" class="form-control" value="${settings.dateY}"></div>
                 </div>
                 
                 <h4 style="margin-top: 16px; margin-bottom: 8px;">Live Preview</h4>
@@ -1625,6 +1702,11 @@ const App = {
             
             const drawPreview = () => {
                 const fd = new FormData(form);
+                const cx = Number(fd.get('chartX')) || 0.5;
+                const cy = Number(fd.get('chartY')) || 0.65;
+                const cs = Number(fd.get('chartScale')) || 1.0;
+                const bx = Number(fd.get('boxX')) || 0.5;
+                const by = Number(fd.get('boxY')) || 0.1;
                 const dx = Number(fd.get('dateX')) || 0.5;
                 const dy = Number(fd.get('dateY')) || 0.9;
                 const dText = App.formatPosterDate(fd.get('dateRaw'));
@@ -1640,11 +1722,19 @@ const App = {
                         
                         ctx.drawImage(img, 0, 0, w, h);
                         
-                        const maxBarH = h * 0.4;
-                        const barW = w * 0.12;
-                        const gap = w * 0.04;
-                        const centerX = w / 2;
-                        const bottomY = h * 0.65;
+                        const maxBarH = h * 0.4 * cs;
+                        const barW = w * 0.12 * cs;
+                        const gap = w * 0.04 * cs;
+                        const centerX = w * cx;
+                        const bottomY = h * cy;
+                        
+                        // Month Title Box
+                        const dateObj = fd.get('dateRaw') ? new Date(fd.get('dateRaw')) : new Date();
+                        const titleTxt = dateObj.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                        ctx.font = `bold ${w * 0.035}px "Outfit", sans-serif`;
+                        ctx.fillStyle = '#000000';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(titleTxt, w * bx, h * by);
                         
                         // Dummy data (70% Paid, 30% Unpaid)
                         const paidPerc = 70;
@@ -1675,7 +1765,7 @@ const App = {
                         ctx.fillRect(unpaidX, unpaidY, barW, unpaidH);
                         
                         ctx.textAlign = 'center';
-                        const fontPerc = w * 0.035;
+                        const fontPerc = w * 0.035 * cs;
                         
                         // Percentage on top
                         ctx.font = `bold ${fontPerc}px "Outfit", sans-serif`;
@@ -1719,6 +1809,13 @@ const App = {
                 if(inp.type !== 'file') inp.addEventListener('input', drawPreview);
             });
             
+            const clearBtn = modal.querySelector('#clearPosterBtn');
+            clearBtn.addEventListener('click', () => {
+                currentTemplateSrc = '';
+                fileInput.value = '';
+                drawPreview();
+            });
+
             fileInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if(file) {
@@ -1737,12 +1834,19 @@ const App = {
                 const newSettings = {
                     template: currentTemplateSrc,
                     dateRaw: fd.get('dateRaw'),
+                    chartX: Number(fd.get('chartX')), chartY: Number(fd.get('chartY')), chartScale: Number(fd.get('chartScale')),
+                    boxX: Number(fd.get('boxX')), boxY: Number(fd.get('boxY')),
                     dateX: Number(fd.get('dateX')), dateY: Number(fd.get('dateY')),
                     paidColor: settings.paidColor, pendingColor: settings.pendingColor
                 };
+                try {
+                    await db.settings.set('posterSettings', newSettings);
+                } catch (e) { console.error('DB set error', e); }
                 
-                await db.settings.set('posterSettings', newSettings);
-                localStorage.setItem('posterSettings', JSON.stringify(newSettings));
+                try {
+                    localStorage.setItem('posterSettings', JSON.stringify(newSettings));
+                } catch(e) { console.warn('localStorage full', e); }
+                
                 UI.showToast("Poster settings saved!");
                 closeFunc();
             });
@@ -1752,6 +1856,8 @@ const App = {
     async generateStatusPoster(dateText) {
         let settings = {
             template: '',
+            chartX: 0.5, chartY: 0.65, chartScale: 1.0,
+            boxX: 0.5, boxY: 0.1,
             dateX: 0.5, dateY: 0.9,
             paidColor: '#16a34a', pendingColor: '#ef4444'
         };
@@ -1803,11 +1909,20 @@ const App = {
             
             ctx.drawImage(img, 0, 0, w, h);
             
-            const maxBarH = h * 0.4;
-            const barW = w * 0.12;
-            const gap = w * 0.04;
-            const centerX = w / 2;
-            const bottomY = h * 0.65;
+            const cs = settings.chartScale || 1.0;
+            const maxBarH = h * 0.4 * cs;
+            const barW = w * 0.12 * cs;
+            const gap = w * 0.04 * cs;
+            const centerX = w * settings.chartX;
+            const bottomY = h * settings.chartY;
+            
+            // Month Title Box
+            const dateObj = dateText ? new Date(dateText) : new Date();
+            const titleTxt = dateObj.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+            ctx.font = `bold ${w * 0.035}px "Outfit", sans-serif`;
+            ctx.fillStyle = '#000000';
+            ctx.textAlign = 'center';
+            ctx.fillText(titleTxt, w * settings.boxX, h * settings.boxY);
             
             const paidH = (paidPerc / 100) * maxBarH;
             const paidX = centerX - barW - (gap / 2);
@@ -1837,7 +1952,7 @@ const App = {
             }
             
             ctx.textAlign = 'center';
-            const fontPerc = w * 0.035;
+            const fontPerc = w * 0.035 * cs;
             
             // Percentage on top
             ctx.font = `bold ${fontPerc}px "Outfit", sans-serif`;
