@@ -68,7 +68,8 @@ const App = {
         const paid = paymentsThisMonth.filter(p => p.status === 'Paid');
         const pending = paymentsThisMonth.filter(p => p.status === 'Pending');
         
-        const paidButNotSent = paid.filter(p => !p.receiptSent);
+        const paidTextNotSent = paid.filter(p => !p.textSent);
+        const paidLinkNotSent = paid.filter(p => !p.receiptSent);
         
         const collectedAmount = paid.reduce((sum, p) => sum + Number(p.amount), 0);
         
@@ -155,12 +156,20 @@ const App = {
                         <i data-lucide="lock" id="templateLockIcon" style="width: 16px; height: 16px; margin: 0;"></i>
                     </div>
                 </button>
-                ${paidButNotSent.length > 0 ? `
-                    <div style="margin-top: 8px;">
-                        <button class="btn blinking-red-btn" style="padding: 6px 12px; font-size: 0.8rem; background: var(--danger); color: white; border-radius: 20px; border: none; display: inline-flex; align-items: center; gap: 6px;" onclick="App.openUnsentReceiptsModal()">
-                            <i data-lucide="send" style="width: 14px; height: 14px;"></i> 
-                            Pending to Send (${paidButNotSent.length})
+                ${paidTextNotSent.length > 0 || paidLinkNotSent.length > 0 ? `
+                    <div style="margin-top: 8px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                        ${paidTextNotSent.length > 0 ? `
+                        <button class="btn blinking-red-btn" style="padding: 6px 12px; font-size: 0.8rem; background: var(--warning); color: #fff; border-radius: 20px; border: none; display: inline-flex; align-items: center; gap: 6px;" onclick="App.openUnsentReceiptsModal()">
+                            <i data-lucide="message-square" style="width: 14px; height: 14px;"></i> 
+                            Pending Texts (${paidTextNotSent.length})
                         </button>
+                        ` : ''}
+                        ${paidLinkNotSent.length > 0 ? `
+                        <button class="btn blinking-red-btn" style="padding: 6px 12px; font-size: 0.8rem; background: var(--danger); color: white; border-radius: 20px; border: none; display: inline-flex; align-items: center; gap: 6px;" onclick="App.openUnsentReceiptsModal()">
+                            <i data-lucide="image" style="width: 14px; height: 14px;"></i> 
+                            Pending Receipts (${paidLinkNotSent.length})
+                        </button>
+                        ` : ''}
                     </div>
                 ` : ''}
             </div>
@@ -211,9 +220,9 @@ const App = {
     async openUnsentReceiptsModal() {
         const currentMonth = getActiveMonth();
         const paymentsThisMonth = await db.payments.where('month').equals(currentMonth).toArray();
-        const unsent = paymentsThisMonth.filter(p => p.status === 'Paid' && !p.receiptSent);
+        const unsent = paymentsThisMonth.filter(p => p.status === 'Paid' && (!p.receiptSent || !p.textSent));
         if(unsent.length === 0) {
-            UI.showToast('No pending receipts to send!', 'info');
+            UI.showToast('No pending messages to send!', 'info');
             return;
         }
         
@@ -226,7 +235,7 @@ const App = {
         }
         
         const content = `
-            <p class="text-muted" style="font-size: 0.9em; margin-bottom: 16px;">Click the WhatsApp icon to generate and send the receipt.</p>
+            <p class="text-muted" style="font-size: 0.9em; margin-bottom: 16px;">Click the icons to send Text or Receipt link.</p>
             <div id="unsentReceiptsList">
                 ${unsentList.map(item => `
                     <div class="list-item" style="padding: 12px; margin-bottom: 8px;">
@@ -235,19 +244,23 @@ const App = {
                             <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">${item.payment.receiptNo} • ₹${item.payment.amount}</p>
                         </div>
                         <div style="display: flex; gap: 8px;">
-                            <button class="btn" style="width: 40px; height: 40px; padding: 0; border-radius: 50%; background: var(--bg-secondary); border: 1px solid var(--border-color); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="App.generateJPG('${item.payment.id}', false);" title="Download Receipt">
-                                <i data-lucide="download" style="width: 20px; height: 20px; color: var(--text-color); margin: 0;"></i>
+                            ${!item.payment.textSent ? `
+                            <button class="btn" style="width: 40px; height: 40px; padding: 0; border-radius: 50%; background: var(--warning); box-shadow: 0 4px 10px rgba(245, 158, 11, 0.4); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="App.sendWhatsAppText('${item.payment.id}'); this.style.display='none';" title="Send Text Only">
+                                <i data-lucide="message-square" style="width: 20px; height: 20px; color: white; margin: 0;"></i>
                             </button>
-                            <button class="btn" style="width: 40px; height: 40px; padding: 0; border-radius: 50%; background: #25D366; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.4); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="App.generateJPG('${item.payment.id}', true); this.parentElement.parentElement.style.opacity='0.5';" title="Send Receipt">
-                                <i data-lucide="message-circle" style="width: 20px; height: 20px; color: white; margin: 0;"></i>
+                            ` : ''}
+                            ${!item.payment.receiptSent ? `
+                            <button class="btn" style="width: 40px; height: 40px; padding: 0; border-radius: 50%; background: #25D366; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.4); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="${item.payment.receiptUrl ? `App.sendWhatsAppLink('${item.payment.id}'); this.style.display='none';` : `App.viewReceipt('${item.payment.id}')`}" title="${item.payment.receiptUrl ? 'Send Receipt Link' : 'Open to generate receipt link'}">
+                                <i data-lucide="image" style="width: 20px; height: 20px; color: white; margin: 0;"></i>
                             </button>
+                            ` : ''}
                         </div>
                     </div>
                 `).join('')}
             </div>
         `;
         
-        UI.openModal('Pending Receipts', content);
+        UI.openModal('Pending Messages', content);
     },
 
     toggleTemplateLock() {
@@ -845,7 +858,9 @@ const App = {
                         amount: Number(fd.get('amount')),
                         method: fd.get('method'),
                         date: fd.get('date'),
-                        receiptNo: receiptNo
+                        receiptNo: receiptNo,
+                        textSent: false,
+                        receiptSent: false
                     });
                     
                     UI.showToast('Payment recorded successfully');
@@ -919,7 +934,8 @@ const App = {
                 method: 'Cash',
                 date: '',
                 receiptNo: '',
-                receiptSent: false
+                receiptSent: false,
+                textSent: false
             });
             UI.showToast('Payment marked as unpaid successfully');
             
@@ -997,31 +1013,39 @@ const App = {
             
             await db.payments.update(paymentId, { receiptUrl: downloadURL });
             
-            const waBtn = document.getElementById('waSendBtn');
+            const waBtn = document.getElementById('waSendLinkBtn');
             if (waBtn && waBtn.dataset.payment === paymentId) {
-                waBtn.innerHTML = `<i data-lucide="share-2"></i> Send via WhatsApp`;
+                waBtn.innerHTML = `<i data-lucide="image"></i> Send Receipt Link`;
                 waBtn.disabled = false;
                 lucide.createIcons({ root: waBtn.parentElement });
             }
         } catch (err) {
             console.error('Upload failed or timed out:', err);
-            const waBtn = document.getElementById('waSendBtn');
+            const waBtn = document.getElementById('waSendLinkBtn');
             if (waBtn && waBtn.dataset.payment === paymentId) {
-                waBtn.innerHTML = `<i data-lucide="share-2"></i> Send via WhatsApp (Text Only)`;
-                waBtn.disabled = false;
+                waBtn.innerHTML = `<i data-lucide="alert-circle"></i> Upload Failed`;
+                waBtn.disabled = true;
                 lucide.createIcons({ root: waBtn.parentElement });
             }
         }
     },
 
-    async sendWhatsApp(paymentId) {
+    async sendWhatsAppText(paymentId) {
         const payment = await db.payments.get(paymentId);
         const parent = await db.parents.get(payment.parentId);
+        const msgText = `*Name:* ${parent.parentName}\n*Amount:* ${payment.amount}\n*Month:* ${formatMonthYear(payment.month)}\n*Receipt No:* ${payment.receiptNo}\n\n*Successfully Received.*`;
         
-        let msgText = `*Name:* ${parent.parentName}\n*Amount:* ${payment.amount}\n*Month:* ${formatMonthYear(payment.month)}\n*Receipt No:* ${payment.receiptNo}\n\n*Successfully Received.*`;
-        if (payment.receiptUrl) {
-            msgText += `\n\nView Receipt: ${payment.receiptUrl}`;
-        }
+        await db.payments.update(paymentId, { textSent: true });
+        const activeNav = document.querySelector('.nav-item.active');
+        if (activeNav) App.renderPage(activeNav.dataset.target);
+        
+        window.open(`https://wa.me/${parent.whatsappNumber}?text=${encodeURIComponent(msgText)}`, '_blank');
+    },
+
+    async sendWhatsAppLink(paymentId) {
+        const payment = await db.payments.get(paymentId);
+        const parent = await db.parents.get(payment.parentId);
+        const msgText = `*Name:* ${parent.parentName}\n*Amount:* ${payment.amount}\n*Month:* ${formatMonthYear(payment.month)}\n*Receipt No:* ${payment.receiptNo}\n\n*Successfully Received.*\n\nView Receipt: ${payment.receiptUrl}`;
         
         await db.payments.update(paymentId, { receiptSent: true });
         const activeNav = document.querySelector('.nav-item.active');
@@ -1069,8 +1093,11 @@ const App = {
             </div>
             
             <div class="flex gap-4" style="flex-direction: column;">
-                <button class="btn btn-primary" id="waSendBtn" data-payment="${paymentId}" onclick="App.sendWhatsApp('${paymentId}')" ${!isUploaded ? 'disabled' : ''}>
-                    <i data-lucide="share-2"></i> ${isUploaded ? 'Send via WhatsApp' : 'Uploading to Cloud...'}
+                <button class="btn btn-primary" onclick="App.sendWhatsAppText('${paymentId}')">
+                    <i data-lucide="message-square"></i> Send Text Only
+                </button>
+                <button class="btn btn-primary" style="background: #25D366; border: none;" id="waSendLinkBtn" data-payment="${paymentId}" onclick="App.sendWhatsAppLink('${paymentId}')" ${!isUploaded ? 'disabled' : ''}>
+                    <i data-lucide="image"></i> ${isUploaded ? 'Send Receipt Link' : 'Uploading to Cloud...'}
                 </button>
                 <button class="btn btn-secondary" onclick="App.generateJPG('${paymentId}', false)">
                     <i data-lucide="download"></i> Download JPG
