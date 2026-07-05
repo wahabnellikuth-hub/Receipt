@@ -27,11 +27,6 @@
 </head>
 <body>
     <div id="app">
-        <!-- Theme Toggle -->
-        <button id="theme-toggle" onclick="App.toggleTheme()" style="position: fixed; top: 16px; right: 16px; z-index: 1000; background: var(--surface-color); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 50%; cursor: pointer; box-shadow: var(--shadow-md); display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; transition: all 0.3s;">
-            <i data-lucide="moon" id="theme-icon" style="width: 20px; height: 20px;"></i>
-        </button>
-
         <!-- Main Content Area -->
         <main id="main-content">
             <!-- Screens will be injected here -->
@@ -51,9 +46,9 @@
                 <i data-lucide="receipt"></i>
                 <span>Payments</span>
             </button>
-            <button class="nav-item" data-target="reports">
-                <i data-lucide="bar-chart-3"></i>
-                <span>Reports</span>
+            <button class="nav-item" data-target="settings">
+                <i data-lucide="settings"></i>
+                <span>Settings</span>
             </button>
         </nav>
     </div>

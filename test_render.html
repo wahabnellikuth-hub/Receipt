@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Receipt Render</title>
+    <style>
+        body { background: #ccc; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        canvas { max-width: 100%; border: 1px solid #000; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <h2>Testing receipt-template.png</h2>
+    <canvas id="canvas1"></canvas>
+    <h2>Testing receipt-template.jpg.png</h2>
+    <canvas id="canvas2"></canvas>
+    <h2>Testing receipt-template.jpg</h2>
+    <canvas id="canvas3"></canvas>
+
+    <script>
+        function drawReceipt(imgSrc, canvasId) {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.getElementById(canvasId);
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                const w = canvas.width;
+                const h = canvas.height;
+                const fontSize = w * 0.024;
+                ctx.font = `600 ${fontSize}px "Outfit", sans-serif`;
+                ctx.fillStyle = '#0f172a';
+                ctx.textAlign = 'left';
+                
+                ctx.fillText('1234', w * 0.44, h * 0.323); // Receipt No
+                
+                const startX = w * 0.52;
+                const lines = [
+                    { y: 0.473, text: 'John Doe Parent' },
+                    { y: 0.527, text: 'July 2026' },
+                    { y: 0.582, text: `Rs. 500/-` },
+                    { y: 0.638, text: 'Five Hundred Only' },
+                    { y: 0.693, text: '04-07-2026' },
+                    { y: 0.748, text: 'Cash' },
+                    { y: 0.803, text: 'No remarks' }
+                ];
+                
+                lines.forEach(line => {
+                    ctx.fillText(line.text, startX, h * line.y);
+                });
+            };
+            img.onerror = () => {
+                console.log('Failed to load', imgSrc);
+            };
+            img.src = imgSrc;
+        }
+
+        drawReceipt('receipt-template.png', 'canvas1');
+        drawReceipt('receipt-template.jpg.png', 'canvas2');
+        drawReceipt('receipt-template.jpg', 'canvas3');
+    </script>
+</body>
+</html>

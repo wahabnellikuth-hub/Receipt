@@ -138,24 +138,19 @@ function setActiveMonth(monthStr) {
 async function generateMonthlyRecords() {
     const currentMonth = getActiveMonth();
     
-    // Get all parents
-    const parents = await db.parents.toArray();
+    // Get all parents and current month's payments concurrently for performance
+    const [parents, currentMonthPayments] = await Promise.all([
+        db.parents.toArray(),
+        db.payments.where('month').equals(currentMonth).toArray()
+    ]);
     
+    const parentsWithPayments = new Set(currentMonthPayments.map(p => p.parentId));
+    
+    const promises = [];
     for (const parent of parents) {
-        // Check if a payment record exists for this month
-        const paymentsSnap = await database.ref('payments')
-            .orderByChild('parentId')
-            .equalTo(parent.id)
-            .once('value');
-            
-        let existingRecord = null;
-        const val = paymentsSnap.val() || {};
-        const records = Object.keys(val).map(k => ({id: String(k), ...val[k]}));
-        existingRecord = records.find(r => r.month === currentMonth);
-            
-        if (!existingRecord) {
+        if (!parentsWithPayments.has(parent.id)) {
             // Create a pending record
-            await db.payments.add({
+            promises.push(db.payments.add({
                 parentId: parent.id,
                 month: currentMonth,
                 status: 'Pending',
@@ -164,8 +159,12 @@ async function generateMonthlyRecords() {
                 method: null,
                 remarks: '',
                 receiptNo: null
-            });
+            }));
         }
+    }
+    
+    if (promises.length > 0) {
+        await Promise.all(promises);
     }
 }
 
@@ -176,11 +175,32 @@ function formatDate(dateObj) {
     return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+function formatMonthYear(monthStr) {
+    if(!monthStr) return '';
+    const parts = monthStr.split('-');
+    if(parts.length !== 2) return monthStr;
+    const d = new Date(parts[0], parseInt(parts[1]) - 1);
+    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
 // Generate Receipt Number
 async function generateReceiptNumber() {
     const payments = await db.payments.where('status').equals('Paid').toArray();
     const count = payments.length;
-    const prefix = "MDR";
-    const year = new Date().getFullYear().toString().slice(-2);
-    return `${prefix}-${year}-${String(count + 1).padStart(4, '0')}`;
+    
+    // Load custom settings or use defaults
+    let settings = {};
+    try {
+        const saved = localStorage.getItem('receiptSettings');
+        if (saved) settings = JSON.parse(saved);
+    } catch(e) {}
+    
+    const prefix = "MUP";
+    
+    const activeMonthStr = getActiveMonth(); // "YYYY-MM"
+    const year = activeMonthStr.substring(2, 4);
+    const month = activeMonthStr.substring(5, 7);
+    const sequence = String(count + 1).padStart(3, '0');
+    
+    return prefix ? `${prefix}${year}${month}${sequence}` : `${year}${month}${sequence}`;
 }

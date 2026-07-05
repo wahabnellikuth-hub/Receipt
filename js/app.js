@@ -30,7 +30,7 @@ const App = {
                 case 'dashboard': await this.renderDashboard(main); break;
                 case 'classes': await this.renderClasses(main); break;
                 case 'payments': await this.renderPayments(main); break;
-                case 'reports': await this.renderReports(main); break;
+                case 'settings': await this.renderSettings(main); break;
             }
             lucide.createIcons();
         } catch (err) {
@@ -51,10 +51,10 @@ const App = {
     },
     
     updateThemeIcon(theme) {
-        const iconBtn = document.getElementById('theme-icon');
-        if (iconBtn) {
-            iconBtn.setAttribute('data-lucide', theme === 'dark' ? 'sun' : 'moon');
-            lucide.createIcons({ root: document.getElementById('theme-toggle') });
+        const settingsIconContainer = document.getElementById('theme-toggle-container');
+        if (settingsIconContainer) {
+            settingsIconContainer.innerHTML = `<i data-lucide="${theme === 'dark' ? 'sun' : 'moon'}" id="theme-icon-settings"></i>`;
+            lucide.createIcons({ root: settingsIconContainer });
         }
     },
 
@@ -97,17 +97,11 @@ const App = {
         }
 
         container.innerHTML = `
-            <div class="flex justify-between align-center mb-4">
-                <div class="flex align-center gap-2">
+            <div style="text-align: center; margin-bottom: 24px;">
+                <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 16px;">
                     <h2 style="margin: 0;">Dashboard</h2>
-                    ${paidButNotSent.length > 0 ? `
-                        <button class="btn" style="padding: 6px; width: 36px; height: 36px; border-radius: 50%; position: relative; background: #25D366; border: none; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="App.openUnsentReceiptsModal()" title="View Pending Receipts">
-                            <i data-lucide="bell" style="margin: 0; width: 18px; height: 18px;"></i>
-                            <span style="position: absolute; top: -4px; right: -4px; background: var(--danger); color: white; border-radius: 50%; font-size: 10px; font-weight: bold; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">${paidButNotSent.length}</span>
-                        </button>
-                    ` : ''}
                 </div>
-                <div class="flex gap-2 align-center">
+                <div style="display: flex; justify-content: center; gap: 8px; align-items: center; flex-wrap: wrap;">
                     <select id="monthSelect" class="form-control" style="width: auto; padding: 4px 8px; font-size: 0.9em;" onchange="App.handleMonthYearChange()">
                         ${monthOptions}
                     </select>
@@ -140,6 +134,20 @@ const App = {
                     <p class="text-muted">Pending Parents</p>
                     <h3 style="color: var(--danger); font-size: 1.5rem; margin-top: 4px;">${pending.length}</h3>
                 </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 24px;">
+                <button class="btn btn-secondary" style="padding: 10px 16px; font-size: 0.9rem; margin-bottom: 8px;" onclick="App.openReceiptSettingsModal()">
+                    <i data-lucide="image"></i> Edit Receipt Template
+                </button>
+                ${paidButNotSent.length > 0 ? `
+                    <div style="margin-top: 8px;">
+                        <button class="btn blinking-red-btn" style="padding: 6px 12px; font-size: 0.8rem; background: var(--danger); color: white; border-radius: 20px; border: none; display: inline-flex; align-items: center; gap: 6px;" onclick="App.openUnsentReceiptsModal()">
+                            <i data-lucide="send" style="width: 14px; height: 14px;"></i> 
+                            Pending to Send (${paidButNotSent.length})
+                        </button>
+                    </div>
+                ` : ''}
             </div>
             
             </div>
@@ -197,15 +205,162 @@ const App = {
                             <h4 style="margin: 0; font-size: 1rem;">${item.parent.parentName}</h4>
                             <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">${item.payment.receiptNo} • ₹${item.payment.amount}</p>
                         </div>
-                        <button class="btn" style="width: 40px; height: 40px; padding: 0; border-radius: 50%; background: #25D366; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.4); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="App.generateJPG('${item.payment.id}', true); this.parentElement.style.opacity='0.5';" title="Send Receipt">
-                            <i data-lucide="message-circle" style="width: 20px; height: 20px; color: white; margin: 0;"></i>
-                        </button>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn" style="width: 40px; height: 40px; padding: 0; border-radius: 50%; background: var(--bg-secondary); border: 1px solid var(--border-color); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="App.generateJPG('${item.payment.id}', false);" title="Download Receipt">
+                                <i data-lucide="download" style="width: 20px; height: 20px; color: var(--text-color); margin: 0;"></i>
+                            </button>
+                            <button class="btn" style="width: 40px; height: 40px; padding: 0; border-radius: 50%; background: #25D366; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.4); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="App.generateJPG('${item.payment.id}', true); this.parentElement.parentElement.style.opacity='0.5';" title="Send Receipt">
+                                <i data-lucide="message-circle" style="width: 20px; height: 20px; color: white; margin: 0;"></i>
+                            </button>
+                        </div>
                     </div>
                 `).join('')}
             </div>
         `;
         
         UI.openModal('Pending Receipts', content);
+    },
+
+    openReceiptSettingsModal() {
+        // Load existing settings
+        let settings = {
+            prefix: '',
+            receiptNoX: 0.44, receiptNoY: 0.323,
+            startX: 0.52,
+            nameY: 0.473, monthY: 0.527, amountY: 0.582, wordsY: 0.638,
+            dateY: 0.693, methodY: 0.748, remarksY: 0.803,
+            template: 'receipt-template.jpg'
+        };
+        try {
+            const saved = localStorage.getItem('receiptSettings');
+            if(saved) settings = { ...settings, ...JSON.parse(saved) };
+        } catch(e) {}
+
+        const content = `
+            <form id="receiptSettingsForm">
+                <div class="form-group" style="text-align: center;">
+                    <label>Receipt Template Background</label>
+                    <canvas id="templatePreviewCanvas" style="max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border-color);"></canvas>
+                    <input type="file" id="templateUpload" accept="image/*" class="form-control" style="font-size: 0.8rem;">
+                    <small class="text-muted">Upload a custom receipt image from your gallery.</small>
+                </div>
+                <h4 style="margin-top: 16px; margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">Text Positions (Multiplier 0.0 - 1.0)</h4>
+                <div class="metrics-grid" style="grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div class="form-group"><label>Receipt No (X)</label><input type="number" step="0.001" name="receiptNoX" class="form-control" value="${settings.receiptNoX}"></div>
+                    <div class="form-group"><label>Receipt No (Y)</label><input type="number" step="0.001" name="receiptNoY" class="form-control" value="${settings.receiptNoY}"></div>
+                    <div class="form-group" style="grid-column: span 2;"><label>Main Fields Start (X)</label><input type="number" step="0.001" name="startX" class="form-control" value="${settings.startX}"></div>
+                    <div class="form-group"><label>Parent Name (Y)</label><input type="number" step="0.001" name="nameY" class="form-control" value="${settings.nameY}"></div>
+                    <div class="form-group"><label>Month (Y)</label><input type="number" step="0.001" name="monthY" class="form-control" value="${settings.monthY}"></div>
+                    <div class="form-group"><label>Amount (Y)</label><input type="number" step="0.001" name="amountY" class="form-control" value="${settings.amountY}"></div>
+                    <div class="form-group"><label>Amount in Words (Y)</label><input type="number" step="0.001" name="wordsY" class="form-control" value="${settings.wordsY}"></div>
+                    <div class="form-group"><label>Date (Y)</label><input type="number" step="0.001" name="dateY" class="form-control" value="${settings.dateY}"></div>
+                    <div class="form-group"><label>Method (Y)</label><input type="number" step="0.001" name="methodY" class="form-control" value="${settings.methodY}"></div>
+                    <div class="form-group"><label>Remarks (Y)</label><input type="number" step="0.001" name="remarksY" class="form-control" value="${settings.remarksY}"></div>
+                </div>
+                <button type="submit" class="btn btn-primary mt-4">Save Receipt Settings</button>
+                <button type="button" class="btn btn-secondary mt-2" onclick="App.resetReceiptSettings()">Reset to Defaults</button>
+            </form>
+        `;
+        
+        UI.openModal('Receipt Editor', content, (modal, closeFunc) => {
+            const fileInput = modal.querySelector('#templateUpload');
+            const canvas = modal.querySelector('#templatePreviewCanvas');
+            const form = modal.querySelector('#receiptSettingsForm');
+            let base64Template = settings.template;
+
+            const drawPreview = () => {
+                const img = new Image();
+                img.onload = () => {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    const w = canvas.width;
+                    const h = canvas.height;
+                    const fontSize = w * 0.024;
+                    ctx.font = `600 ${fontSize}px "Outfit", sans-serif`;
+                    ctx.fillStyle = '#0f172a';
+                    ctx.textAlign = 'left';
+
+                    const fd = new FormData(form);
+                    const rx = Number(fd.get('receiptNoX')) || 0;
+                    const ry = Number(fd.get('receiptNoY')) || 0;
+                    const sx = Number(fd.get('startX')) || 0;
+
+                    const previewReceiptNo = `MUP2607001`;
+                    ctx.fillText(previewReceiptNo, w * rx, h * ry);
+
+                    const lines = [
+                        { y: Number(fd.get('nameY')) || 0, text: 'Student Name' },
+                        { y: Number(fd.get('monthY')) || 0, text: formatMonthYear('2026-07') },
+                        { y: Number(fd.get('amountY')) || 0, text: 'Rs. 1000/-' },
+                        { y: Number(fd.get('wordsY')) || 0, text: 'One Thousand Only' },
+                        { y: Number(fd.get('dateY')) || 0, text: '05-Jul-2026' },
+                        { y: Number(fd.get('methodY')) || 0, text: 'Cash' },
+                        { y: Number(fd.get('remarksY')) || 0, text: 'Jazakkallah', isRemarks: true }
+                    ];
+
+                    lines.forEach(line => {
+                        if (line.isRemarks) {
+                            ctx.fillStyle = '#16a34a'; // Green
+                        } else {
+                            ctx.fillStyle = '#0f172a';
+                        }
+                        ctx.fillText(line.text, w * sx, h * line.y);
+                    });
+                };
+                img.src = base64Template;
+            };
+
+            // Draw initial preview
+            drawPreview();
+
+            // Redraw on any input change
+            form.addEventListener('input', drawPreview);
+
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if(file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        base64Template = e.target.result;
+                        drawPreview();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const fd = new FormData(e.target);
+                const newSettings = {
+                    receiptNoX: Number(fd.get('receiptNoX')),
+                    receiptNoY: Number(fd.get('receiptNoY')),
+                    startX: Number(fd.get('startX')),
+                    nameY: Number(fd.get('nameY')),
+                    monthY: Number(fd.get('monthY')),
+                    amountY: Number(fd.get('amountY')),
+                    wordsY: Number(fd.get('wordsY')),
+                    dateY: Number(fd.get('dateY')),
+                    methodY: Number(fd.get('methodY')),
+                    remarksY: Number(fd.get('remarksY')),
+                    template: base64Template
+                };
+                localStorage.setItem('receiptSettings', JSON.stringify(newSettings));
+                UI.showToast('Receipt settings saved!');
+                closeFunc();
+            });
+        });
+    },
+
+    resetReceiptSettings() {
+        if(confirm('Reset all receipt settings to defaults?')) {
+            localStorage.removeItem('receiptSettings');
+            UI.showToast('Settings reset. Please reopen modal.');
+            const closeBtn = document.querySelector('.close-btn');
+            if(closeBtn) closeBtn.click();
+        }
     },
 
     // --- CLASSES & PARENTS ---
@@ -233,10 +388,10 @@ const App = {
         iconsHtml += `</div>`;
         
         let html = `
-            <div class="flex justify-between align-center mb-4">
-                <h2>Parents Directory</h2>
-                <button class="btn btn-primary" style="width: auto; padding: 8px 12px;" onclick="App.openAddParentModal()">
-                    <i data-lucide="user-plus"></i> Add
+            <div style="margin-bottom: 20px; text-align: center;">
+                <h2 style="margin-bottom: 16px;">Parents Directory</h2>
+                <button class="btn btn-primary" onclick="App.openAddParentModal()">
+                    <i data-lucide="user-plus"></i> Add Parent
                 </button>
             </div>
             
@@ -462,10 +617,35 @@ const App = {
         
         // State for filters
         window.currentPaymentFilter = window.currentPaymentFilter || 'Pending';
+
+        let iconsHtml = `<div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px;">`;
+        classes.forEach((cls, i) => {
+            const num = i + 1; // 1 to 10
+            const isActive = window.currentPaymentClassFilter === cls.id;
+            iconsHtml += `
+                <div onclick="App.filterPaymentByClass('${cls.id}')" style="
+                    display: flex; flex-direction: column; align-items: center; justify-content: center;
+                    aspect-ratio: 1; border-radius: 16px; cursor: pointer; transition: all 0.2s;
+                    background: ${isActive ? 'var(--primary-600)' : 'var(--bg-color)'};
+                    color: ${isActive ? 'white' : 'var(--text-color)'};
+                    border: 1px solid ${isActive ? 'var(--primary-600)' : 'var(--border-color)'};
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+                ">
+                    <span style="font-size: 1.5rem; font-weight: 700;">${num}</span>
+                </div>
+            `;
+        });
+        iconsHtml += `</div>`;
         
         const renderList = (filter) => {
             window.currentPaymentFilter = filter;
-            const filtered = enriched.filter(p => filter === 'All' || p.status === filter);
+            const filtered = enriched.filter(p => {
+                let match = filter === 'All' || p.status === filter;
+                if(window.currentPaymentClassFilter) {
+                    match = match && (p.parent.classId === window.currentPaymentClassFilter);
+                }
+                return match;
+            });
             
             let html = '';
             if(filtered.length === 0) html = `<p class="text-center text-muted mt-4">No records found.</p>`;
@@ -473,7 +653,7 @@ const App = {
             filtered.forEach(p => {
                 const isPaid = p.status === 'Paid';
                 html += `
-                    <div class="list-item" style="cursor:pointer">
+                    <div class="list-item payment-item" data-name="${(p.parent.parentName || '').toLowerCase()}" data-phone="${p.parent.whatsappNumber || ''}" style="cursor:pointer">
                         <div class="list-item-content" onclick="${isPaid ? `App.viewReceipt('${p.id}')` : `App.recordPayment('${p.id}')`}" style="flex:1">
                             <h3>${p.parent.parentName}</h3>
                             <p>${p.className} • ₹${p.parent.monthlyFee}</p>
@@ -507,12 +687,22 @@ const App = {
                     btn.style.color = btn.innerText === filter ? 'var(--primary-600)' : 'var(--text-muted)';
                     btn.style.fontWeight = btn.innerText === filter ? '600' : '500';
                 });
+                
+                if (typeof App.filterPaymentsSearch === 'function') {
+                    App.filterPaymentsSearch();
+                }
             }
             return html;
         };
         
         container.innerHTML = `
-            <h2>Payments (${currentMonth})</h2>
+            <h2 style="text-align: center; margin-bottom: 16px;">Payments (${currentMonth})</h2>
+            
+            ${iconsHtml}
+            
+            <div class="form-group">
+                <input type="text" id="paymentSearch" class="form-control" placeholder="Search by name or number..." onkeyup="App.filterPaymentsSearch()">
+            </div>
             
             <div class="flex mt-4 mb-4" style="border-bottom: 1px solid var(--border-color);">
                 <button class="filter-tab" style="flex:1; padding: 12px; background:none; border:none; border-bottom: 2px solid var(--primary-600); color: var(--primary-600); font-weight: 600;" onclick="App.renderPaymentList('Pending')">Pending</button>
@@ -527,6 +717,30 @@ const App = {
         
         // Expose renderList globally for the buttons
         App.renderPaymentList = renderList;
+    },
+
+    filterPaymentByClass(classId) {
+        if(window.currentPaymentClassFilter === classId) {
+            window.currentPaymentClassFilter = null;
+        } else {
+            window.currentPaymentClassFilter = classId;
+        }
+        this.renderPage('payments');
+    },
+
+    filterPaymentsSearch() {
+        const searchEl = document.getElementById('paymentSearch');
+        if (!searchEl) return;
+        const term = searchEl.value.toLowerCase();
+        document.querySelectorAll('.payment-item').forEach(el => {
+            const name = el.dataset.name || '';
+            const phone = el.dataset.phone || '';
+            if (name.includes(term) || phone.includes(term)) {
+                el.style.display = 'flex';
+            } else {
+                el.style.display = 'none';
+            }
+        });
     },
 
     async recordPayment(paymentId) {
@@ -767,7 +981,19 @@ const App = {
             const parent = await db.parents.get(payment.parentId);
             const cls = await db.classes.get(parent.classId);
             
-            const templateSrc = 'receipt-template.jpg';
+            let settings = {
+                receiptNoX: 0.44, receiptNoY: 0.323,
+                startX: 0.52,
+                nameY: 0.473, monthY: 0.527, amountY: 0.582, wordsY: 0.638,
+                dateY: 0.693, methodY: 0.748, remarksY: 0.803,
+                template: 'receipt-template.jpg'
+            };
+            try {
+                const saved = localStorage.getItem('receiptSettings');
+                if(saved) settings = { ...settings, ...JSON.parse(saved) };
+            } catch(e) {}
+            
+            const templateSrc = settings.template;
             const img = new Image();
             
             img.onload = () => {
@@ -785,20 +1011,25 @@ const App = {
                 ctx.fillStyle = '#0f172a';
                 ctx.textAlign = 'left';
                 
-                ctx.fillText(payment.receiptNo, w * 0.44, h * 0.323);
+                ctx.fillText(payment.receiptNo, w * settings.receiptNoX, h * settings.receiptNoY);
                 
-                const startX = w * 0.52;
+                const startX = w * settings.startX;
                 const lines = [
-                    { y: 0.473, text: parent.parentName },
-                    { y: 0.527, text: payment.month },
-                    { y: 0.582, text: `Rs. ${payment.amount}/-` },
-                    { y: 0.638, text: App.amountToWords(payment.amount) },
-                    { y: 0.693, text: formatDate(payment.date) },
-                    { y: 0.748, text: payment.method },
-                    { y: 0.803, text: payment.remarks || '-' }
+                    { y: settings.nameY, text: parent.parentName },
+                    { y: settings.monthY, text: formatMonthYear(payment.month) },
+                    { y: settings.amountY, text: `Rs. ${payment.amount}/-` },
+                    { y: settings.wordsY, text: App.amountToWords(payment.amount) },
+                    { y: settings.dateY, text: formatDate(payment.date) },
+                    { y: settings.methodY, text: payment.method },
+                    { y: settings.remarksY, text: payment.remarks || 'Jazakkallah', isRemarks: true }
                 ];
                 
                 lines.forEach(line => {
+                    if (line.isRemarks) {
+                        ctx.fillStyle = '#16a34a'; // Green
+                    } else {
+                        ctx.fillStyle = '#0f172a';
+                    }
                     ctx.fillText(line.text, startX, h * line.y);
                 });
                 
@@ -824,7 +1055,7 @@ const App = {
             };
             
             img.onerror = () => {
-                UI.showToast("Template image not found!", "error");
+                UI.showToast("Template image not found or invalid!", "error");
             };
             
             img.src = templateSrc;
@@ -851,19 +1082,35 @@ const App = {
         return str.trim() + ' Only';
     },
 
-    // --- REPORTS ---
-    async renderReports(container) {
+    // --- SETTINGS ---
+    async renderSettings(container) {
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+        const lucideIcon = currentTheme === 'dark' ? 'sun' : 'moon';
+
         container.innerHTML = `
-            <h2>Reports & Exports</h2>
+            <div style="margin-bottom: 20px; text-align: center;">
+                <h2 style="margin-bottom: 16px;">Settings</h2>
+            </div>
+            
             <div class="card mt-4">
-                <h3>Export to Excel</h3>
+                <h3>App Preferences</h3>
+                <div class="flex justify-between align-center mt-2">
+                    <span style="font-weight: 500;">Dark Mode</span>
+                    <button class="btn btn-secondary" style="width: auto; padding: 8px 16px;" onclick="App.toggleTheme()">
+                        <span id="theme-toggle-container" style="display: flex; align-items: center; justify-content: center;"><i data-lucide="${lucideIcon}" id="theme-icon-settings"></i></span> Toggle
+                    </button>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <h3>Reports & Exports</h3>
                 <p class="text-muted mb-4">Download comprehensive reports in XLSX format.</p>
                 
                 <div class="flex gap-4" style="flex-direction: column;">
                     <button class="btn btn-secondary" onclick="App.exportParents()">
                         <i data-lucide="users"></i> Export All Parents
                     </button>
-                    <button class="btn btn-secondary" onclick="App.exportPayments()">
+                    <button class="btn btn-secondary" onclick="App.openExportPaymentsModal()">
                         <i data-lucide="receipt"></i> Export This Month Payments
                     </button>
                 </div>
@@ -877,6 +1124,8 @@ const App = {
                 </button>
             </div>
         `;
+        
+        lucide.createIcons({ root: container });
     },
 
     async clearDatabase() {
@@ -916,10 +1165,37 @@ const App = {
         
         this.downloadExcel(data, 'Parents_List.xlsx');
     },
+    openExportPaymentsModal() {
+        const content = `
+            <p>Select which payments to include in the export for the current month:</p>
+            <div class="flex gap-4" style="flex-direction: column; margin-top: 16px;">
+                <button class="btn btn-primary" onclick="App.exportPayments('Pending'); document.querySelector('.modal-close').click()">
+                    <i data-lucide="clock"></i> Export Pending Only
+                </button>
+                <button class="btn btn-primary" style="background: var(--success); border-color: var(--success);" onclick="App.exportPayments('Paid'); document.querySelector('.modal-close').click()">
+                    <i data-lucide="check-circle"></i> Export Paid Only
+                </button>
+                <button class="btn btn-secondary" onclick="App.exportPayments('All'); document.querySelector('.modal-close').click()">
+                    <i data-lucide="list"></i> Export All
+                </button>
+            </div>
+        `;
+        UI.openModal('Export Payments', content);
+    },
 
-    async exportPayments() {
+    async exportPayments(filterType = 'All') {
         const currentMonth = getActiveMonth();
-        const payments = await db.payments.where('month').equals(currentMonth).toArray();
+        let payments = await db.payments.where('month').equals(currentMonth).toArray();
+        
+        if (filterType !== 'All') {
+            payments = payments.filter(p => p.status === filterType);
+        }
+        
+        if (payments.length === 0) {
+            UI.showToast('No records found for this filter.', 'info');
+            return;
+        }
+        
         const parents = await db.parents.toArray();
         const classes = await db.classes.toArray();
         
@@ -937,7 +1213,7 @@ const App = {
             };
         });
         
-        this.downloadExcel(data, `Payments_${currentMonth}.xlsx`);
+        this.downloadExcel(data, `Payments_${currentMonth}_${filterType}.xlsx`);
     },
 
     downloadExcel(jsonArray, fileName) {
