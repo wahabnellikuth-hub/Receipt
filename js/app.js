@@ -97,11 +97,21 @@ const App = {
         }
 
         container.innerHTML = `
+            <div style="text-align: left; margin-bottom: 32px; margin-top: 16px; padding: 0 8px;">
+                <h1 style="font-size: clamp(2.2rem, 9vw, 3rem); font-weight: 700; color: #005a9c; margin: 0; line-height: 1.15; letter-spacing: -1px;">
+                    <div class="kinetic-text" style="animation-delay: 0.1s; display: block; font-weight: 600; font-size: 0.85em; margin-bottom: 4px;">Welcome to</div>
+                    <div class="kinetic-text" style="animation-delay: 0.3s; display: block;">MANSHAUL ULOOM</div>
+                    <div class="kinetic-text" style="animation-delay: 0.5s; display: block;">MADRASA</div>
+                </h1>
+            </div>
             <div style="text-align: center; margin-bottom: 24px;">
                 <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 16px;">
                     <h2 style="margin: 0;">Dashboard</h2>
                 </div>
                 <div style="display: flex; justify-content: center; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <button class="btn btn-secondary" style="width: auto; padding: 4px 8px;" onclick="App.goToPreviousMonth()" title="Go to Previous Month">
+                        <i data-lucide="chevron-left" style="margin: 0; width: 20px; height: 20px;"></i>
+                    </button>
                     <select id="monthSelect" class="form-control" style="width: auto; padding: 4px 8px; font-size: 0.9em;" onchange="App.handleMonthYearChange()">
                         ${monthOptions}
                     </select>
@@ -167,7 +177,21 @@ const App = {
         this.changeMonth(`${y}-${m}`);
     },
 
+    async goToPreviousMonth() {
+        if (!confirm('Are you sure you want to navigate to the previous month?')) return;
+        const current = getActiveMonth();
+        let [year, month] = current.split('-').map(Number);
+        month--;
+        if (month < 1) {
+            month = 12;
+            year--;
+        }
+        const prev = `${year}-${String(month).padStart(2, '0')}`;
+        await this.changeMonth(prev);
+    },
+
     async proceedToNextMonth() {
+        if (!confirm('Are you sure you want to navigate to the next month?')) return;
         const current = getActiveMonth();
         let [year, month] = current.split('-').map(Number);
         month++;

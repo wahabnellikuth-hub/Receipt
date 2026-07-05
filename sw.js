@@ -1,4 +1,4 @@
-const CACHE_NAME = 'madrassa-fee-v14';
+const CACHE_NAME = 'madrassa-fee-v21';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
@@ -6,7 +6,8 @@ const ASSETS_TO_CACHE = [
     '/js/db.js',
     '/js/ui.js',
     '/js/app.js',
-    '/manifest.json'
+    '/manifest.json',
+    '/logo-circle.png'
 ];
 
 self.addEventListener('install', (event) => {
