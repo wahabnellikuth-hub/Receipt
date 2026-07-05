@@ -720,7 +720,7 @@ const App = {
         };
         
         container.innerHTML = `
-            <h2 style="text-align: center; margin-bottom: 16px;">Payments (${currentMonth})</h2>
+            <h2 style="text-align: center; margin-bottom: 16px;">Payments (${formatMonthYear(currentMonth)})</h2>
             
             ${iconsHtml}
             
@@ -1010,7 +1010,7 @@ const App = {
                 startX: 0.52,
                 nameY: 0.473, monthY: 0.527, amountY: 0.582, wordsY: 0.638,
                 dateY: 0.693, methodY: 0.748, remarksY: 0.803,
-                template: 'receipt-template.jpg'
+                template: 'receipt-template.png'
             };
             try {
                 const saved = localStorage.getItem('receiptSettings');
@@ -1019,6 +1019,7 @@ const App = {
             
             const templateSrc = settings.template;
             const img = new Image();
+            img.crossOrigin = 'anonymous';
             
             img.onload = () => {
                 const canvas = document.createElement('canvas');
