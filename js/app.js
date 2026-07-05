@@ -429,6 +429,25 @@ const App = {
         const classes = await db.classes.toArray();
         const parents = await db.parents.toArray();
         
+        let iconsHtml = `<div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px;">`;
+        classes.forEach((cls, i) => {
+            const num = i + 1; // 1 to 10
+            const isActive = window.currentClassFilter === cls.id;
+            iconsHtml += `
+                <div onclick="App.filterByClass('${cls.id}')" style="
+                    display: flex; flex-direction: column; align-items: center; justify-content: center;
+                    aspect-ratio: 1; border-radius: 16px; cursor: pointer; transition: all 0.2s;
+                    background: ${isActive ? 'var(--primary-600)' : 'var(--bg-color)'};
+                    color: ${isActive ? 'white' : 'var(--text-color)'};
+                    border: 1px solid ${isActive ? 'var(--primary-600)' : 'var(--border-color)'};
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+                ">
+                    <span style="font-size: 1.5rem; font-weight: 700;">${num}</span>
+                </div>
+            `;
+        });
+        iconsHtml += `</div>`;
+
         let html = `
             <div style="margin-bottom: 20px; text-align: center;">
                 <h2 style="margin-bottom: 16px;">Parents Directory</h2>
@@ -436,6 +455,8 @@ const App = {
                     <i data-lucide="user-plus"></i> Add Parent
                 </button>
             </div>
+            
+            ${iconsHtml}
             
             <div class="form-group">
                 <input type="text" id="parentSearch" class="form-control" placeholder="Search by name or number..." onkeyup="App.filterParents()">
@@ -448,14 +469,23 @@ const App = {
         if (parents.length === 0) {
             html += `<p class="text-center text-muted">No parents added yet.</p>`;
         } else {
-            // Display parents in the order they were added
-            parents.forEach((p, index) => {
-                html += `
-                    <div class="list-item parent-item" data-name="${p.parentName.toLowerCase()}" data-phone="${p.whatsappNumber}">
-                        <div class="list-item-content">
-                            <h3>${index + 1}. ${p.parentName} ${p.studentName ? `<span style="font-weight: 300; font-size: 0.85em;">(${p.studentName})</span>` : ''}</h3>
-                            <p>${p.whatsappNumber ? p.whatsappNumber : '<i data-lucide="phone-off" style="width: 14px; height: 14px; color: var(--danger); vertical-align: text-bottom; margin-right: 2px;"></i><span style="color: var(--danger); font-size: 0.9em;">No Phone</span>'} • ₹${p.monthlyFee}/mo</p>
-                        </div>
+            // Filter by class if active
+            const filteredParents = window.currentClassFilter 
+                ? parents.filter(p => p.classId === window.currentClassFilter) 
+                : parents;
+
+            if (filteredParents.length === 0) {
+                html += `<p class="text-center text-muted">No parents found in this class.</p>`;
+            } else {
+                // Display parents in the order they were added
+                filteredParents.forEach((p) => {
+                    const originalIndex = parents.indexOf(p);
+                    html += `
+                        <div class="list-item parent-item" data-name="${p.parentName.toLowerCase()}" data-phone="${p.whatsappNumber}">
+                            <div class="list-item-content">
+                                <h3>${originalIndex + 1}. ${p.parentName} ${p.studentName ? `<span style="font-weight: 300; font-size: 0.85em;">(${p.studentName})</span>` : ''}</h3>
+                                <p>${p.whatsappNumber ? p.whatsappNumber : '<i data-lucide="phone-off" style="width: 14px; height: 14px; color: var(--danger); vertical-align: text-bottom; margin-right: 2px;"></i><span style="color: var(--danger); font-size: 0.9em;">No Phone</span>'} • ₹${p.monthlyFee}/mo</p>
+                            </div>
                         <div class="flex gap-2" style="align-items: center;">
                             <button class="btn btn-secondary" style="width: auto; padding: 6px;" onclick="App.editParent('${p.id}')" title="Edit">
                                 <i data-lucide="edit-2" style="margin: 0; width: 16px; height: 16px;"></i>
@@ -467,6 +497,7 @@ const App = {
                     </div>
                 `;
             });
+            } // close inner else
         }
         
         html += `</div></div>`;
@@ -650,11 +681,34 @@ const App = {
         
         // State for filters
         window.currentPaymentFilter = window.currentPaymentFilter || 'Pending';
+
+        let iconsHtml = `<div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px;">`;
+        classes.forEach((cls, i) => {
+            const num = i + 1; // 1 to 10
+            const isActive = window.currentPaymentClassFilter === cls.id;
+            iconsHtml += `
+                <div onclick="App.filterPaymentByClass('${cls.id}')" style="
+                    display: flex; flex-direction: column; align-items: center; justify-content: center;
+                    aspect-ratio: 1; border-radius: 16px; cursor: pointer; transition: all 0.2s;
+                    background: ${isActive ? 'var(--primary-600)' : 'var(--bg-color)'};
+                    color: ${isActive ? 'white' : 'var(--text-color)'};
+                    border: 1px solid ${isActive ? 'var(--primary-600)' : 'var(--border-color)'};
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+                ">
+                    <span style="font-size: 1.5rem; font-weight: 700;">${num}</span>
+                </div>
+            `;
+        });
+        iconsHtml += `</div>`;
         
         const renderList = (filter) => {
             window.currentPaymentFilter = filter;
             const filtered = enriched.filter(p => {
-                return filter === 'All' || p.status === filter;
+                let match = filter === 'All' || p.status === filter;
+                if(window.currentPaymentClassFilter) {
+                    match = match && (p.parent.classId === window.currentPaymentClassFilter);
+                }
+                return match;
             });
             
             let html = '';
@@ -707,6 +761,8 @@ const App = {
         
         container.innerHTML = `
             <h2 style="text-align: center; margin-bottom: 16px;">Payments (${formatMonthYear(currentMonth)})</h2>
+            
+            ${iconsHtml}
             
             <div class="form-group">
                 <input type="text" id="paymentSearch" class="form-control" placeholder="Search by name or number..." onkeyup="App.filterPaymentsSearch()">
