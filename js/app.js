@@ -146,9 +146,14 @@ const App = {
                 </div>
             </div>
             
-            <div style="text-align: center; margin-top: 24px;">
-                <button class="btn btn-secondary" style="padding: 10px 16px; font-size: 0.9rem; margin-bottom: 8px;" onclick="App.openReceiptSettingsModal()">
-                    <i data-lucide="image"></i> Edit Receipt Template
+            <div style="text-align: center; margin-top: 24px; display: flex; flex-direction: column; align-items: center;">
+                <button class="btn" id="editTemplateBtn" style="background: var(--primary-600); color: white; padding: 10px 16px; font-size: 0.9rem; margin-bottom: 8px; display: inline-flex; align-items: center; justify-content: space-between; width: 260px; transition: all 0.3s; opacity: 0.7;" onclick="if(window.isTemplateUnlocked) { App.openReceiptSettingsModal(); } else { UI.showToast('Please tap the lock icon to unlock editing.', 'info'); }">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i data-lucide="image"></i> Edit Receipt Template
+                    </div>
+                    <div style="padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.2);" onclick="event.stopPropagation(); App.toggleTemplateLock()">
+                        <i data-lucide="lock" id="templateLockIcon" style="width: 16px; height: 16px; margin: 0;"></i>
+                    </div>
                 </button>
                 ${paidButNotSent.length > 0 ? `
                     <div style="margin-top: 8px;">
@@ -243,6 +248,23 @@ const App = {
         `;
         
         UI.openModal('Pending Receipts', content);
+    },
+
+    toggleTemplateLock() {
+        window.isTemplateUnlocked = !window.isTemplateUnlocked;
+        const icon = document.getElementById('templateLockIcon');
+        const btn = document.getElementById('editTemplateBtn');
+        
+        if (window.isTemplateUnlocked) {
+            icon.setAttribute('data-lucide', 'unlock');
+            btn.style.opacity = '1';
+            UI.showToast('Template editing unlocked!', 'success');
+        } else {
+            icon.setAttribute('data-lucide', 'lock');
+            btn.style.opacity = '0.7';
+            UI.showToast('Template editing locked.', 'info');
+        }
+        lucide.createIcons({ root: btn });
     },
 
     async openReceiptSettingsModal() {
