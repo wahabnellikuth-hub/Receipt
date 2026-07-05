@@ -68,8 +68,7 @@ const App = {
         const paid = paymentsThisMonth.filter(p => p.status === 'Paid');
         const pending = paymentsThisMonth.filter(p => p.status === 'Pending');
         
-        const paidTextNotSent = paid.filter(p => !p.textSent);
-        const paidLinkNotSent = paid.filter(p => !p.receiptSent);
+        const unsentMessages = paid.filter(p => !p.textSent || !p.receiptSent);
         
         const collectedAmount = paid.reduce((sum, p) => sum + Number(p.amount), 0);
         
@@ -147,8 +146,8 @@ const App = {
                 </div>
             </div>
             
-            <div style="text-align: center; margin-top: 24px; display: flex; flex-direction: column; align-items: center;">
-                <button class="btn" id="editTemplateBtn" style="background: var(--primary-600); color: white; padding: 10px 16px; font-size: 0.9rem; margin-bottom: 8px; display: inline-flex; align-items: center; justify-content: space-between; width: 260px; transition: all 0.3s; opacity: 0.7;" onclick="if(window.isTemplateUnlocked) { App.openReceiptSettingsModal(); } else { UI.showToast('Please tap the lock icon to unlock editing.', 'info'); }">
+            <div style="text-align: center; margin-top: 24px; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                <button class="btn" id="editTemplateBtn" style="background: var(--primary-600); color: white; padding: 10px 16px; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: space-between; width: 260px; transition: all 0.3s; opacity: 0.7;" onclick="if(window.isTemplateUnlocked) { App.openReceiptSettingsModal(); } else { UI.showToast('Please tap the lock icon to unlock editing.', 'info'); }">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <i data-lucide="image"></i> Edit Receipt Template
                     </div>
@@ -156,22 +155,20 @@ const App = {
                         <i data-lucide="lock" id="templateLockIcon" style="width: 16px; height: 16px; margin: 0;"></i>
                     </div>
                 </button>
-                ${paidTextNotSent.length > 0 || paidLinkNotSent.length > 0 ? `
-                    <div style="margin-top: 8px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
-                        ${paidTextNotSent.length > 0 ? `
-                        <button class="btn blinking-red-btn" style="padding: 6px 12px; font-size: 0.8rem; background: var(--warning); color: #fff; border-radius: 20px; border: none; display: inline-flex; align-items: center; gap: 6px;" onclick="App.openUnsentReceiptsModal()">
-                            <i data-lucide="message-square" style="width: 14px; height: 14px;"></i> 
-                            Pending Texts (${paidTextNotSent.length})
+                
+                <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 8px;">
+                    ${unsentMessages.length > 0 ? `
+                        <button class="btn" style="position: relative; padding: 10px 16px; font-size: 0.9rem; background: #25D366; color: white; border-radius: 12px; border: none; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3); transition: transform 0.2s;" onclick="App.openUnsentReceiptsModal()" onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform='scale(1)'" onmouseleave="this.style.transform='scale(1)'">
+                            <i data-lucide="message-circle" style="width: 18px; height: 18px;"></i> 
+                            Pending Messages
+                            <span style="position: absolute; top: -8px; right: -8px; background: var(--danger); color: white; font-size: 0.75rem; font-weight: bold; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 2px solid var(--surface-color); box-shadow: 0 2px 5px rgba(0,0,0,0.2);">${unsentMessages.length}</span>
                         </button>
-                        ` : ''}
-                        ${paidLinkNotSent.length > 0 ? `
-                        <button class="btn blinking-red-btn" style="padding: 6px 12px; font-size: 0.8rem; background: var(--danger); color: white; border-radius: 20px; border: none; display: inline-flex; align-items: center; gap: 6px;" onclick="App.openUnsentReceiptsModal()">
-                            <i data-lucide="image" style="width: 14px; height: 14px;"></i> 
-                            Pending Receipts (${paidLinkNotSent.length})
-                        </button>
-                        ` : ''}
-                    </div>
-                ` : ''}
+                    ` : ''}
+                    <button class="btn" style="padding: 10px 16px; font-size: 0.9rem; background: var(--primary-600); color: white; border-radius: 12px; border: none; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: transform 0.2s;" onclick="App.openPosterGeneratorModal()" onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform='scale(1)'" onmouseleave="this.style.transform='scale(1)'">
+                        <i data-lucide="bar-chart-2" style="width: 18px; height: 18px;"></i> 
+                        Status Poster
+                    </button>
+                </div>
             </div>
             
             </div>
@@ -235,7 +232,7 @@ const App = {
         }
         
         const content = `
-            <p class="text-muted" style="font-size: 0.9em; margin-bottom: 16px;">Click the icons to send Text or Receipt link.</p>
+            <p class="text-muted" style="font-size: 0.9em; margin-bottom: 16px;">Click the WhatsApp icon to message the parent.</p>
             <div id="unsentReceiptsList">
                 ${unsentList.map(item => `
                     <div class="list-item" style="padding: 12px; margin-bottom: 8px;">
@@ -244,16 +241,9 @@ const App = {
                             <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">${item.payment.receiptNo} • ₹${item.payment.amount}</p>
                         </div>
                         <div style="display: flex; gap: 8px;">
-                            ${!item.payment.textSent ? `
-                            <button class="btn" style="width: 40px; height: 40px; padding: 0; border-radius: 50%; background: var(--warning); box-shadow: 0 4px 10px rgba(245, 158, 11, 0.4); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="App.sendWhatsAppText('${item.payment.id}'); this.style.display='none';" title="Send Text Only">
-                                <i data-lucide="message-square" style="width: 20px; height: 20px; color: white; margin: 0;"></i>
+                            <button class="btn" style="width: 40px; height: 40px; padding: 0; border-radius: 50%; background: #25D366; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.4); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="App.openWhatsApp('${item.payment.id}'); this.style.display='none';" title="Open WhatsApp">
+                                <i data-lucide="message-circle" style="width: 20px; height: 20px; color: white; margin: 0;"></i>
                             </button>
-                            ` : ''}
-                            ${!item.payment.receiptSent ? `
-                            <button class="btn" style="width: 40px; height: 40px; padding: 0; border-radius: 50%; background: #25D366; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.4); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="${item.payment.receiptUrl ? `App.sendWhatsAppLink('${item.payment.id}'); this.style.display='none';` : `App.viewReceipt('${item.payment.id}')`}" title="${item.payment.receiptUrl ? 'Send Receipt Link' : 'Open to generate receipt link'}">
-                                <i data-lucide="image" style="width: 20px; height: 20px; color: white; margin: 0;"></i>
-                            </button>
-                            ` : ''}
                         </div>
                     </div>
                 `).join('')}
@@ -283,7 +273,7 @@ const App = {
     async openReceiptSettingsModal() {
         // Load existing settings
         let settings = {
-            prefix: '',
+            nextReceiptNumber: 1,
             receiptNoX: 0.44, receiptNoY: 0.323,
             startX: 0.52,
             nameY: 0.473, monthY: 0.527, amountY: 0.582, wordsY: 0.638,
@@ -312,6 +302,10 @@ const App = {
                     <canvas id="templatePreviewCanvas" style="max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border-color);"></canvas>
                     <input type="file" id="templateUpload" accept="image/*" class="form-control" style="font-size: 0.8rem;">
                     <small class="text-muted">Upload a custom receipt image from your gallery.</small>
+                </div>
+                <h4 style="margin-top: 16px; margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">Receipt Sequence</h4>
+                <div class="metrics-grid" style="grid-template-columns: 1fr; gap: 8px;">
+                    <div class="form-group"><label>Next Number</label><input type="number" name="nextReceiptNumber" class="form-control no-arrows" value="${settings.nextReceiptNumber}"></div>
                 </div>
                 <h4 style="margin-top: 16px; margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">Text Positions (Multiplier 0.0 - 1.0)</h4>
                 <div class="metrics-grid" style="grid-template-columns: 1fr 1fr; gap: 8px;">
@@ -357,7 +351,7 @@ const App = {
                     const ry = Number(fd.get('receiptNoY')) || 0;
                     const sx = Number(fd.get('startX')) || 0;
 
-                    const previewReceiptNo = `MUP2607001`;
+                    const previewReceiptNo = fd.get('nextReceiptNumber') || '1';
                     ctx.fillText(previewReceiptNo, w * rx, h * ry);
 
                     const lines = [
@@ -404,6 +398,7 @@ const App = {
                 e.preventDefault();
                 const fd = new FormData(e.target);
                 const newSettings = {
+                    nextReceiptNumber: Number(fd.get('nextReceiptNumber')),
                     receiptNoX: Number(fd.get('receiptNoX')),
                     receiptNoY: Number(fd.get('receiptNoY')),
                     startX: Number(fd.get('startX')),
@@ -681,6 +676,8 @@ const App = {
     async renderPayments(container) {
         const currentMonth = getActiveMonth();
         const payments = await db.payments.where('month').equals(currentMonth).toArray();
+        const allPending = await db.payments.where('status').equals('Pending').toArray();
+        const pastPending = allPending.filter(p => p.month < currentMonth);
         const parents = await db.parents.toArray();
         const classes = await db.classes.toArray();
         
@@ -689,7 +686,8 @@ const App = {
             const pay = payments.find(p => p.parentId === parent.id);
             if (!pay) return null;
             const cls = classes.find(c => c.id === parent.classId) || {};
-            return { ...pay, parent, className: cls.name, serialNo: index + 1 };
+            const hasPastDue = pastPending.some(p => p.parentId === parent.id);
+            return { ...pay, parent, className: cls.name, serialNo: index + 1, hasPastDue };
         }).filter(p => p !== null);
         
         // State for filters
@@ -730,10 +728,13 @@ const App = {
             filtered.forEach(p => {
                 const isPaid = p.status === 'Paid';
                 html += `
-                    <div class="list-item payment-item" data-name="${(p.parent.parentName || '').toLowerCase()}" data-phone="${p.parent.whatsappNumber || ''}" style="cursor:pointer">
+                    <div class="list-item payment-item" data-name="${(p.parent.parentName || '').toLowerCase()}" data-phone="${p.parent.whatsappNumber || ''}" style="cursor:pointer; ${p.hasPastDue && !isPaid ? 'border-left: 4px solid var(--danger); background-color: rgba(239, 68, 68, 0.05);' : ''}">
                         <div class="list-item-content" onclick="${isPaid ? `App.viewReceipt('${p.id}')` : `App.recordPayment('${p.id}')`}" style="flex:1">
-                            <h3>${p.serialNo}. ${p.parent.parentName}</h3>
-                            <p>${p.className} • ₹${p.parent.monthlyFee}</p>
+                            <h3 style="${p.hasPastDue && !isPaid ? 'color: var(--danger); font-weight: bold;' : ''}">
+                                ${p.serialNo}. ${p.parent.parentName}
+                                ${p.hasPastDue ? `<button class="btn" style="padding: 2px 8px; font-size: 0.7rem; background: var(--danger); color: white; border-radius: 12px; border: none; margin-left: 8px; font-weight: bold; height: auto;" onclick="event.stopPropagation(); App.showPastDues('${p.parent.id}')">View Past Dues</button>` : ''}
+                            </h3>
+                            <p style="${p.hasPastDue && !isPaid ? 'color: var(--danger); font-weight: 600;' : ''}">${p.className} • ₹${p.parent.monthlyFee}</p>
                         </div>
                         <div class="flex align-center gap-2">
                             <span class="badge ${isPaid ? 'badge-success' : 'badge-danger'}" onclick="${isPaid ? `App.viewReceipt('${p.id}')` : `App.recordPayment('${p.id}')`}">${p.status}</span>
@@ -824,8 +825,24 @@ const App = {
         const payment = await db.payments.get(paymentId);
         const parent = await db.parents.get(payment.parentId);
         
+        let settings = { prefix: 'MUP', nextReceiptNumber: 1 };
+        try {
+            let globalSaved = await db.settings.get('receiptSettings');
+            if (!globalSaved) {
+                const localSaved = localStorage.getItem('receiptSettings');
+                if (localSaved) globalSaved = JSON.parse(localSaved);
+            }
+            if (globalSaved) settings = { ...settings, ...globalSaved };
+        } catch(e) {}
+        
         const content = `
             <form id="recordPaymentForm">
+                <div class="form-group">
+                    <label>Receipt Number</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="number" name="receiptNumber" class="form-control no-arrows" style="flex: 1;" value="${settings.nextReceiptNumber || 1}" inputmode="numeric" required>
+                    </div>
+                </div>
                 <div class="form-group">
                     <label>Amount Received (₹)</label>
                     <input type="number" name="amount" class="form-control" value="${parent.monthlyFee}" inputmode="numeric" required>
@@ -852,7 +869,13 @@ const App = {
                 const fd = new FormData(e.target);
                 
                 try {
-                    const receiptNo = await generateReceiptNumber();
+                    const num = fd.get('receiptNumber');
+                    const receiptNo = `${num}`;
+                    
+                    settings.nextReceiptNumber = Number(num) + 1;
+                    await db.settings.set('receiptSettings', settings);
+                    localStorage.setItem('receiptSettings', JSON.stringify(settings));
+
                     await db.payments.update(paymentId, {
                         status: 'Paid',
                         amount: Number(fd.get('amount')),
@@ -998,60 +1021,15 @@ const App = {
         });
     },
 
-    async uploadReceiptBackground(paymentId) {
-        try {
-            const payment = await db.payments.get(paymentId);
-            if (payment.receiptUrl) return; // Already uploaded
-            
-            const blob = await App.getReceiptBlob(paymentId);
-            const storageRef = firebase.storage().ref(`receipts/${payment.receiptNo}.jpg`);
-            
-            // Timeout logic to prevent hanging
-            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000));
-            await Promise.race([storageRef.put(blob), timeout]);
-            const downloadURL = await storageRef.getDownloadURL();
-            
-            await db.payments.update(paymentId, { receiptUrl: downloadURL });
-            
-            const waBtn = document.getElementById('waSendLinkBtn');
-            if (waBtn && waBtn.dataset.payment === paymentId) {
-                waBtn.innerHTML = `<i data-lucide="image"></i> Send Receipt Link`;
-                waBtn.disabled = false;
-                lucide.createIcons({ root: waBtn.parentElement });
-            }
-        } catch (err) {
-            console.error('Upload failed or timed out:', err);
-            const waBtn = document.getElementById('waSendLinkBtn');
-            if (waBtn && waBtn.dataset.payment === paymentId) {
-                waBtn.innerHTML = `<i data-lucide="alert-circle"></i> Upload Failed`;
-                waBtn.disabled = true;
-                lucide.createIcons({ root: waBtn.parentElement });
-            }
-        }
-    },
-
-    async sendWhatsAppText(paymentId) {
+    async openWhatsApp(paymentId) {
         const payment = await db.payments.get(paymentId);
         const parent = await db.parents.get(payment.parentId);
-        const msgText = `*Name:* ${parent.parentName}\n*Amount:* ${payment.amount}\n*Month:* ${formatMonthYear(payment.month)}\n*Receipt No:* ${payment.receiptNo}\n\n*Successfully Received.*`;
         
-        await db.payments.update(paymentId, { textSent: true });
+        await db.payments.update(paymentId, { textSent: true, receiptSent: true });
         const activeNav = document.querySelector('.nav-item.active');
         if (activeNav) App.renderPage(activeNav.dataset.target);
         
-        window.open(`https://wa.me/${parent.whatsappNumber}?text=${encodeURIComponent(msgText)}`, '_blank');
-    },
-
-    async sendWhatsAppLink(paymentId) {
-        const payment = await db.payments.get(paymentId);
-        const parent = await db.parents.get(payment.parentId);
-        const msgText = `*Name:* ${parent.parentName}\n*Amount:* ${payment.amount}\n*Month:* ${formatMonthYear(payment.month)}\n*Receipt No:* ${payment.receiptNo}\n\n*Successfully Received.*\n\nView Receipt: ${payment.receiptUrl}`;
-        
-        await db.payments.update(paymentId, { receiptSent: true });
-        const activeNav = document.querySelector('.nav-item.active');
-        if (activeNav) App.renderPage(activeNav.dataset.target);
-        
-        window.open(`https://wa.me/${parent.whatsappNumber}?text=${encodeURIComponent(msgText)}`, '_blank');
+        window.open(`https://wa.me/${parent.whatsappNumber}`, '_blank');
     },
 
     async viewReceipt(paymentId) {
@@ -1093,13 +1071,10 @@ const App = {
             </div>
             
             <div class="flex gap-4" style="flex-direction: column;">
-                <button class="btn btn-primary" onclick="App.sendWhatsAppText('${paymentId}')">
-                    <i data-lucide="message-square"></i> Send Text Only
+                <button class="btn btn-primary" style="background: #25D366; border: none;" onclick="App.openWhatsApp('${paymentId}')">
+                    <i data-lucide="message-circle"></i> Open WhatsApp
                 </button>
-                <button class="btn btn-primary" style="background: #25D366; border: none;" id="waSendLinkBtn" data-payment="${paymentId}" onclick="App.sendWhatsAppLink('${paymentId}')" ${!isUploaded ? 'disabled' : ''}>
-                    <i data-lucide="image"></i> ${isUploaded ? 'Send Receipt Link' : 'Uploading to Cloud...'}
-                </button>
-                <button class="btn btn-secondary" onclick="App.generateJPG('${paymentId}', false)">
+                <button class="btn btn-secondary" onclick="App.generateJPG('${paymentId}')">
                     <i data-lucide="download"></i> Download JPG
                 </button>
                 <button class="btn" style="border: 1px solid var(--danger); color: var(--danger); background: transparent;" onclick="App.undoPayment('${paymentId}')">
@@ -1116,10 +1091,56 @@ const App = {
             if(backBtn) {
                 backBtn.addEventListener('click', closeFunc);
             }
-            if (!isUploaded) {
-                App.uploadReceiptBackground(paymentId);
-            }
         });
+    },
+
+    async showPastDues(parentId) {
+        const currentMonth = getActiveMonth();
+        const parent = await db.parents.get(parentId);
+        if (!parent) return;
+
+        const allPending = await db.payments.where('status').equals('Pending').toArray();
+        const pastPending = allPending.filter(p => p.parentId === parentId && p.month < currentMonth);
+
+        // Sort by oldest month first
+        pastPending.sort((a, b) => a.month.localeCompare(b.month));
+
+        if (pastPending.length === 0) {
+            UI.showToast('No past dues found for this parent.', 'info');
+            return;
+        }
+
+        let totalDue = 0;
+        let listHtml = pastPending.map(p => {
+            totalDue += Number(parent.monthlyFee);
+            return `
+                <div class="list-item" style="padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid var(--warning);">
+                    <div>
+                        <h4 style="margin: 0;">${formatMonthYear(p.month)}</h4>
+                        <p style="margin: 0; font-size: 0.8em; color: var(--text-muted);">₹${parent.monthlyFee}</p>
+                    </div>
+                    <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="
+                        const modals = document.querySelectorAll('.modal-backdrop');
+                        if (modals.length > 0) { modals[modals.length - 1].querySelector('.close-btn').click(); }
+                        App.recordPayment('${p.id}');
+                    ">
+                        Pay Now
+                    </button>
+                </div>
+            `;
+        }).join('');
+
+        const content = `
+            <div style="margin-bottom: 16px;">
+                <p style="margin: 0; color: var(--text-muted); font-size: 0.9em;">Outstanding Months</p>
+                <h2 style="margin: 4px 0 0 0; color: var(--danger);">Total: ₹${totalDue}</h2>
+            </div>
+            <div style="max-height: 400px; overflow-y: auto; padding-right: 4px;">
+                ${listHtml}
+            </div>
+        `;
+
+        UI.openModal(`Past Dues: ${parent.parentName}`, content);
     },
 
     // --- WHATSAPP & PDF ---
@@ -1158,13 +1179,8 @@ const App = {
         });
     },
 
-    async generateJPG(paymentId, sendViaWhatsapp) {
+    async generateJPG(paymentId) {
         try {
-            if(sendViaWhatsapp) {
-                await db.payments.update(paymentId, { receiptSent: true });
-                const activeNav = document.querySelector('.nav-item.active');
-                if (activeNav) App.renderPage(activeNav.dataset.target);
-            }
             const payment = await db.payments.get(paymentId);
             const parent = await db.parents.get(payment.parentId);
             const cls = await db.classes.get(parent.classId);
@@ -1232,35 +1248,11 @@ const App = {
                 
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
                 
-                if(sendViaWhatsapp) {
-                    UI.showToast("Uploading receipt to cloud...", "info");
-                    fetch(dataUrl)
-                        .then(res => res.blob())
-                        .then(async (blob) => {
-                            try {
-                                const storageRef = firebase.storage().ref(`receipts/${payment.receiptNo}.jpg`);
-                                await storageRef.put(blob);
-                                const downloadURL = await storageRef.getDownloadURL();
-                                
-                                const msgText = `*Name:* ${parent.parentName}\n*Amount:* ${payment.amount}\n*Month:* ${formatMonthYear(payment.month)}\n*Receipt No:* ${payment.receiptNo}\n\n*Successfully Received.*\n\nView Receipt: ${downloadURL}`;
-                                
-                                window.open(`https://wa.me/${parent.whatsappNumber}?text=${encodeURIComponent(msgText)}`, '_blank');
-                                UI.showToast("Opening WhatsApp...");
-                            } catch (error) {
-                                console.error('Upload failed', error);
-                                UI.showToast("Cloud upload failed. Using text only.", "error");
-                                
-                                const msgText = `*Name:* ${parent.parentName}\n*Amount:* ${payment.amount}\n*Month:* ${formatMonthYear(payment.month)}\n*Receipt No:* ${payment.receiptNo}\n\n*Successfully Received.*`;
-                                window.open(`https://wa.me/${parent.whatsappNumber}?text=${encodeURIComponent(msgText)}`, '_blank');
-                            }
-                        });
-                } else {
-                    const link = document.createElement('a');
-                    link.href = dataUrl;
-                    link.download = `${payment.receiptNo}.jpg`;
-                    link.click();
-                    UI.showToast("Receipt Downloaded");
-                }
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = `${payment.receiptNo}.jpg`;
+                link.click();
+                UI.showToast("Receipt Downloaded");
             };
             
             img.onerror = () => {
@@ -1531,6 +1523,358 @@ const App = {
         XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
         XLSX.writeFile(workbook, fileName);
         UI.showToast("Exported Successfully!");
+    },
+
+    formatPosterDate(rawString) {
+        if (!rawString) return '';
+        const d = new Date(rawString);
+        if (isNaN(d.getTime())) return rawString;
+        return `Last Updated on ${d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true })}`;
+    },
+
+    async openPosterGeneratorModal() {
+        let savedDateRaw = '';
+        try {
+            const saved = await db.settings.get('posterSettings');
+            if (saved && saved.dateRaw) savedDateRaw = saved.dateRaw;
+            else {
+                const local = localStorage.getItem('posterSettings');
+                if (local) {
+                    const parsed = JSON.parse(local);
+                    if (parsed.dateRaw) savedDateRaw = parsed.dateRaw;
+                }
+            }
+        } catch(e) {}
+        
+        if (!savedDateRaw) {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            savedDateRaw = now.toISOString().slice(0,16);
+        }
+        
+        const content = `
+            <div class="form-group">
+                <label>Last Updated Date & Time</label>
+                <input type="datetime-local" id="posterDateInput" class="form-control" value="${savedDateRaw}">
+            </div>
+            
+            <div class="flex gap-4" style="flex-direction: column; margin-top: 16px;">
+                <button class="btn btn-primary" style="background: var(--primary-600); color: white; border: none;" onclick="App.generateStatusPoster(document.getElementById('posterDateInput').value)">
+                    <i data-lucide="download"></i> Download Poster
+                </button>
+                <button class="btn btn-secondary" onclick="App.openPosterSettingsModal()">
+                    <i data-lucide="settings"></i> Edit Poster Template
+                </button>
+            </div>
+        `;
+        UI.openModal('Status Poster', content);
+    },
+
+    async openPosterSettingsModal() {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        const defaultRaw = now.toISOString().slice(0,16);
+        
+        let settings = {
+            template: '',
+            dateRaw: defaultRaw,
+            dateX: 0.5, dateY: 0.9,
+            paidColor: '#16a34a', pendingColor: '#ef4444'
+        };
+        try {
+            let saved = await db.settings.get('posterSettings');
+            if (!saved) {
+                const local = localStorage.getItem('posterSettings');
+                if(local) saved = JSON.parse(local);
+            }
+            if(saved) settings = { ...settings, ...saved };
+        } catch(e) {}
+        
+        const content = `
+            <form id="posterSettingsForm">
+                <div class="form-group">
+                    <label>Poster Template Image</label>
+                    <input type="file" id="posterTemplateUpload" accept="image/png, image/jpeg" class="form-control" style="padding: 4px;">
+                </div>
+                <h4 style="margin-top: 16px; margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">Date Text Alignment (Multiplier 0.0 - 1.0)</h4>
+                <div class="form-group">
+                    <label>Date & Time</label>
+                    <input type="datetime-local" name="dateRaw" class="form-control" value="${settings.dateRaw}">
+                </div>
+                <div class="metrics-grid" style="grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div class="form-group"><label>Date Text X</label><input type="number" step="0.01" name="dateX" class="form-control no-arrows" value="${settings.dateX}"></div>
+                    <div class="form-group"><label>Date Text Y</label><input type="number" step="0.01" name="dateY" class="form-control no-arrows" value="${settings.dateY}"></div>
+                </div>
+                
+                <h4 style="margin-top: 16px; margin-bottom: 8px;">Live Preview</h4>
+                <div style="border: 1px dashed var(--border-color); padding: 4px; text-align: center; border-radius: 8px; background: var(--bg-color);">
+                    <canvas id="posterPreviewCanvas" style="max-width: 100%; height: auto; max-height: 250px; background: #fff;"></canvas>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="margin-top: 16px; width: 100%;">Save Settings</button>
+            </form>
+        `;
+        
+        UI.openModal('Edit Poster Template', content, (modal, closeFunc) => {
+            const form = modal.querySelector('#posterSettingsForm');
+            const fileInput = modal.querySelector('#posterTemplateUpload');
+            const canvas = modal.querySelector('#posterPreviewCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            let currentTemplateSrc = settings.template;
+            
+            const drawPreview = () => {
+                const fd = new FormData(form);
+                const dx = Number(fd.get('dateX')) || 0.5;
+                const dy = Number(fd.get('dateY')) || 0.9;
+                const dText = App.formatPosterDate(fd.get('dateRaw'));
+                
+                if (currentTemplateSrc) {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload = () => {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const w = canvas.width;
+                        const h = canvas.height;
+                        
+                        ctx.drawImage(img, 0, 0, w, h);
+                        
+                        const maxBarH = h * 0.4;
+                        const barW = w * 0.12;
+                        const gap = w * 0.04;
+                        const centerX = w / 2;
+                        const bottomY = h * 0.65;
+                        
+                        // Dummy data (70% Paid, 30% Unpaid)
+                        const paidPerc = 70;
+                        const pendingPerc = 30;
+                        
+                        const paidH = (paidPerc / 100) * maxBarH;
+                        const paidX = centerX - barW - (gap / 2);
+                        const paidY = bottomY - paidH;
+                        
+                        const unpaidH = (pendingPerc / 100) * maxBarH;
+                        const unpaidX = centerX + (gap / 2);
+                        const unpaidY = bottomY - unpaidH;
+                        
+                        // Draw Underline Base
+                        ctx.beginPath();
+                        ctx.moveTo(centerX - barW * 1.5, bottomY);
+                        ctx.lineTo(centerX + barW * 1.5, bottomY);
+                        ctx.strokeStyle = '#334155';
+                        ctx.lineWidth = Math.max(2, h * 0.003);
+                        ctx.stroke();
+                        
+                        // Draw Paid
+                        ctx.fillStyle = settings.paidColor;
+                        ctx.fillRect(paidX, paidY, barW, paidH);
+                        
+                        // Draw Unpaid
+                        ctx.fillStyle = settings.pendingColor;
+                        ctx.fillRect(unpaidX, unpaidY, barW, unpaidH);
+                        
+                        ctx.textAlign = 'center';
+                        const fontPerc = w * 0.035;
+                        
+                        // Percentage on top
+                        ctx.font = `bold ${fontPerc}px "Outfit", sans-serif`;
+                        ctx.fillStyle = settings.paidColor;
+                        ctx.fillText(`${paidPerc}%`, paidX + (barW / 2), paidY - (h * 0.02));
+                        
+                        ctx.fillStyle = settings.pendingColor;
+                        ctx.fillText(`${pendingPerc}%`, unpaidX + (barW / 2), unpaidY - (h * 0.02));
+                        
+                        // Counts below
+                        ctx.font = `600 ${fontPerc * 0.7}px "Outfit", sans-serif`;
+                        ctx.fillStyle = settings.paidColor;
+                        ctx.fillText("70 Paid", paidX + (barW / 2), bottomY + (h * 0.04));
+                        
+                        ctx.fillStyle = settings.pendingColor;
+                        ctx.fillText("30 Unpaid", unpaidX + (barW / 2), bottomY + (h * 0.04));
+                        
+                        // Date
+                        ctx.font = `500 ${fontPerc * 0.6}px "Outfit", sans-serif`;
+                        ctx.fillStyle = '#64748b';
+                        ctx.fillText(dText, w * dx, h * dy);
+                    };
+                    img.onerror = () => {
+                        canvas.width = 400; canvas.height = 200;
+                        ctx.clearRect(0,0,400,200);
+                        ctx.font = '16px sans-serif';
+                        ctx.fillText("Image Error", 150, 100);
+                    };
+                    img.src = currentTemplateSrc;
+                } else {
+                    canvas.width = 400; canvas.height = 200;
+                    ctx.clearRect(0,0,400,200);
+                    ctx.font = '16px sans-serif';
+                    ctx.fillText("No Template Uploaded", 120, 100);
+                }
+            };
+            
+            drawPreview();
+            
+            form.querySelectorAll('input').forEach(inp => {
+                if(inp.type !== 'file') inp.addEventListener('input', drawPreview);
+            });
+            
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if(file) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        currentTemplateSrc = ev.target.result;
+                        drawPreview();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+            
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const fd = new FormData(e.target);
+                const newSettings = {
+                    template: currentTemplateSrc,
+                    dateRaw: fd.get('dateRaw'),
+                    dateX: Number(fd.get('dateX')), dateY: Number(fd.get('dateY')),
+                    paidColor: settings.paidColor, pendingColor: settings.pendingColor
+                };
+                
+                await db.settings.set('posterSettings', newSettings);
+                localStorage.setItem('posterSettings', JSON.stringify(newSettings));
+                UI.showToast("Poster settings saved!");
+                closeFunc();
+            });
+        });
+    },
+
+    async generateStatusPoster(dateText) {
+        let settings = {
+            template: '',
+            dateX: 0.5, dateY: 0.9,
+            paidColor: '#16a34a', pendingColor: '#ef4444'
+        };
+        try {
+            let saved = await db.settings.get('posterSettings');
+            if (!saved) {
+                const local = localStorage.getItem('posterSettings');
+                if(local) saved = JSON.parse(local);
+            }
+            if(saved) settings = { ...settings, ...saved };
+        } catch(e) {}
+        
+        if (!settings.template) {
+            UI.showToast("Please upload a Poster Template first in settings.", "error");
+            return;
+        }
+        
+        UI.showToast("Generating poster...");
+        
+        const currentMonth = getActiveMonth();
+        const payments = await db.payments.where('month').equals(currentMonth).toArray();
+        let paidCount = 0;
+        let pendingCount = 0;
+        
+        // Count from all active parents to get true pending status for the month
+        const parents = await db.parents.toArray();
+        parents.forEach(parent => {
+            const pay = payments.find(p => p.parentId === parent.id);
+            if (pay && pay.status === 'Paid') {
+                paidCount++;
+            } else {
+                pendingCount++;
+            }
+        });
+        
+        const total = paidCount + pendingCount;
+        const paidPerc = total === 0 ? 0 : Math.round((paidCount / total) * 100);
+        const pendingPerc = total === 0 ? 0 : 100 - paidPerc;
+        
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+            
+            ctx.drawImage(img, 0, 0, w, h);
+            
+            const maxBarH = h * 0.4;
+            const barW = w * 0.12;
+            const gap = w * 0.04;
+            const centerX = w / 2;
+            const bottomY = h * 0.65;
+            
+            const paidH = (paidPerc / 100) * maxBarH;
+            const paidX = centerX - barW - (gap / 2);
+            const paidY = bottomY - paidH;
+            
+            const unpaidH = (pendingPerc / 100) * maxBarH;
+            const unpaidX = centerX + (gap / 2);
+            const unpaidY = bottomY - unpaidH;
+            
+            // Draw Underline Base
+            ctx.beginPath();
+            ctx.moveTo(centerX - barW * 1.5, bottomY);
+            ctx.lineTo(centerX + barW * 1.5, bottomY);
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = Math.max(2, h * 0.003);
+            ctx.stroke();
+            
+            // Draw Green Paid Bar
+            if (paidH > 0) {
+                ctx.fillStyle = settings.paidColor;
+                ctx.fillRect(paidX, paidY, barW, paidH);
+            }
+            // Draw Red Unpaid Bar
+            if (unpaidH > 0) {
+                ctx.fillStyle = settings.pendingColor;
+                ctx.fillRect(unpaidX, unpaidY, barW, unpaidH);
+            }
+            
+            ctx.textAlign = 'center';
+            const fontPerc = w * 0.035;
+            
+            // Percentage on top
+            ctx.font = `bold ${fontPerc}px "Outfit", sans-serif`;
+            if (paidH > 0) {
+                ctx.fillStyle = settings.paidColor;
+                ctx.fillText(`${paidPerc}%`, paidX + (barW / 2), paidY - (h * 0.02));
+            }
+            if (unpaidH > 0) {
+                ctx.fillStyle = settings.pendingColor;
+                ctx.fillText(`${pendingPerc}%`, unpaidX + (barW / 2), unpaidY - (h * 0.02));
+            }
+            
+            // Counts below
+            ctx.font = `600 ${fontPerc * 0.7}px "Outfit", sans-serif`;
+            ctx.fillStyle = settings.paidColor;
+            ctx.fillText(`${paidCount} Paid`, paidX + (barW / 2), bottomY + (h * 0.04));
+            
+            ctx.fillStyle = settings.pendingColor;
+            ctx.fillText(`${pendingCount} Unpaid`, unpaidX + (barW / 2), bottomY + (h * 0.04));
+            
+            // Date
+            ctx.font = `500 ${fontPerc * 0.6}px "Outfit", sans-serif`;
+            ctx.fillStyle = '#64748b';
+            const dText = App.formatPosterDate(dateText); // Using dateText argument which is raw date string from input
+            ctx.fillText(dText, w * settings.dateX, h * settings.dateY);
+            
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = `Status_Poster_${currentMonth}.jpg`;
+            link.click();
+            UI.showToast("Poster Downloaded Successfully!");
+        };
+        img.onerror = () => {
+            UI.showToast("Template image not found or invalid!", "error");
+        };
+        img.src = settings.template;
     }
 };
 
