@@ -938,10 +938,104 @@ const App = {
         }
     },
 
+    async getReceiptBlob(paymentId) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const payment = await db.payments.get(paymentId);
+                const parent = await db.parents.get(payment.parentId);
+                let settings = { receiptNoX: 0.44, receiptNoY: 0.323, startX: 0.52, nameY: 0.473, monthY: 0.527, amountY: 0.582, wordsY: 0.638, dateY: 0.693, methodY: 0.748, remarksY: 0.803, template: 'receipt-template.png' };
+                try {
+                    let globalSaved = await db.settings.get('receiptSettings');
+                    if (!globalSaved) {
+                        const localSaved = localStorage.getItem('receiptSettings');
+                        if(localSaved) { globalSaved = JSON.parse(localSaved); await db.settings.set('receiptSettings', globalSaved); }
+                    }
+                    if(globalSaved) settings = { ...settings, ...globalSaved };
+                } catch(e) {}
+                
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width; canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const w = canvas.width; const h = canvas.height;
+                    ctx.font = `600 ${w * 0.024}px "Outfit", sans-serif`;
+                    ctx.fillStyle = '#0f172a'; ctx.textAlign = 'left';
+                    ctx.fillText(payment.receiptNo, w * settings.receiptNoX, h * settings.receiptNoY);
+                    const lines = [
+                        { y: settings.nameY, text: parent.parentName }, { y: settings.monthY, text: formatMonthYear(payment.month) },
+                        { y: settings.amountY, text: `Rs. ${payment.amount}/-` }, { y: settings.wordsY, text: App.amountToWords(payment.amount) },
+                        { y: settings.dateY, text: formatDate(payment.date) }, { y: settings.methodY, text: payment.method },
+                        { y: settings.remarksY, text: payment.remarks || 'Jazakkallah', isRemarks: true }
+                    ];
+                    lines.forEach(line => {
+                        ctx.fillStyle = line.isRemarks ? '#16a34a' : '#0f172a';
+                        ctx.fillText(line.text, w * settings.startX, h * line.y);
+                    });
+                    canvas.toBlob(resolve, 'image/jpeg', 0.95);
+                };
+                img.onerror = () => reject(new Error("Template image invalid"));
+                img.src = settings.template;
+            } catch (err) { reject(err); }
+        });
+    },
+
+    async uploadReceiptBackground(paymentId) {
+        try {
+            const payment = await db.payments.get(paymentId);
+            if (payment.receiptUrl) return; // Already uploaded
+            
+            const blob = await App.getReceiptBlob(paymentId);
+            const storageRef = firebase.storage().ref(`receipts/${payment.receiptNo}.jpg`);
+            
+            // Timeout logic to prevent hanging
+            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000));
+            await Promise.race([storageRef.put(blob), timeout]);
+            const downloadURL = await storageRef.getDownloadURL();
+            
+            await db.payments.update(paymentId, { receiptUrl: downloadURL });
+            
+            const waBtn = document.getElementById('waSendBtn');
+            if (waBtn && waBtn.dataset.payment === paymentId) {
+                waBtn.innerHTML = `<i data-lucide="share-2"></i> Send via WhatsApp`;
+                waBtn.disabled = false;
+                lucide.createIcons({ root: waBtn.parentElement });
+            }
+        } catch (err) {
+            console.error('Upload failed or timed out:', err);
+            const waBtn = document.getElementById('waSendBtn');
+            if (waBtn && waBtn.dataset.payment === paymentId) {
+                waBtn.innerHTML = `<i data-lucide="share-2"></i> Send via WhatsApp (Text Only)`;
+                waBtn.disabled = false;
+                lucide.createIcons({ root: waBtn.parentElement });
+            }
+        }
+    },
+
+    async sendWhatsApp(paymentId) {
+        const payment = await db.payments.get(paymentId);
+        const parent = await db.parents.get(payment.parentId);
+        
+        let msgText = `*Name:* ${parent.parentName}\n*Amount:* ${payment.amount}\n*Month:* ${formatMonthYear(payment.month)}\n*Receipt No:* ${payment.receiptNo}\n\n*Successfully Received.*`;
+        if (payment.receiptUrl) {
+            msgText += `\n\nView Receipt: ${payment.receiptUrl}`;
+        }
+        
+        await db.payments.update(paymentId, { receiptSent: true });
+        const activeNav = document.querySelector('.nav-item.active');
+        if (activeNav) App.renderPage(activeNav.dataset.target);
+        
+        window.open(`https://wa.me/${parent.whatsappNumber}?text=${encodeURIComponent(msgText)}`, '_blank');
+    },
+
     async viewReceipt(paymentId) {
         const payment = await db.payments.get(paymentId);
         const parent = await db.parents.get(payment.parentId);
         const cls = await db.classes.get(parent.classId);
+        
+        const isUploaded = !!payment.receiptUrl;
         
         const content = `
             <div style="border: 1px dashed var(--border-color); padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
@@ -975,8 +1069,8 @@ const App = {
             </div>
             
             <div class="flex gap-4" style="flex-direction: column;">
-                <button class="btn btn-primary" onclick="App.generateJPG('${paymentId}', true)">
-                    <i data-lucide="share-2"></i> Send via WhatsApp
+                <button class="btn btn-primary" id="waSendBtn" data-payment="${paymentId}" onclick="App.sendWhatsApp('${paymentId}')" ${!isUploaded ? 'disabled' : ''}>
+                    <i data-lucide="share-2"></i> ${isUploaded ? 'Send via WhatsApp' : 'Uploading to Cloud...'}
                 </button>
                 <button class="btn btn-secondary" onclick="App.generateJPG('${paymentId}', false)">
                     <i data-lucide="download"></i> Download JPG
@@ -994,6 +1088,9 @@ const App = {
             const backBtn = modal.querySelector('#backToPaymentsBtn');
             if(backBtn) {
                 backBtn.addEventListener('click', closeFunc);
+            }
+            if (!isUploaded) {
+                App.uploadReceiptBackground(paymentId);
             }
         });
     },
