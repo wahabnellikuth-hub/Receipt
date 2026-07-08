@@ -61,8 +61,21 @@ const App = {
     // --- DASHBOARD ---
     async renderDashboard(container) {
         const currentMonth = getActiveMonth();
-        const classesCount = await db.classes.count();
-        const parentsCount = await db.parents.count();
+        const classes = await db.classes.toArray();
+        const parents = await db.parents.toArray();
+        const classesCount = classes.length;
+        const parentsCount = parents.length;
+        
+        let globalSettings = await db.settings.get('receiptSettings') || {};
+        try {
+            const localSaved = localStorage.getItem('receiptSettings');
+            if(localSaved && !globalSettings.nextReceiptNumber) {
+                globalSettings = JSON.parse(localSaved);
+            }
+        } catch(e) {}
+        const instLine1 = globalSettings.instLine1 || 'MANSHAUL ULOOM';
+        const instLine2 = globalSettings.instLine2 || 'MADRASA';
+
         
         const paymentsThisMonth = await db.payments.where('month').equals(currentMonth).toArray();
         const paid = paymentsThisMonth.filter(p => p.status === 'Paid');
@@ -73,7 +86,7 @@ const App = {
         let collectedBase = 0;
         let collectedAdvance = 0;
         for (let p of paid) {
-            const parent = await db.parents.get(p.parentId);
+            const parent = parents.find(x => x.id === p.parentId);
             const fee = parent ? Number(parent.monthlyFee) : 0;
             const amt = Number(p.amount);
             if (amt > fee && fee > 0) {
@@ -87,7 +100,7 @@ const App = {
         // We need parent info to calculate pending amount accurately (monthlyFee)
         let pendingAmount = 0;
         for (let p of pending) {
-            const parent = await db.parents.get(p.parentId);
+            const parent = parents.find(x => x.id === p.parentId);
             if(parent) pendingAmount += Number(parent.monthlyFee);
         }
 
@@ -112,8 +125,8 @@ const App = {
             <div style="text-align: left; margin-bottom: 32px; margin-top: 16px; padding: 0 8px;">
                 <h1 style="font-size: clamp(2.2rem, 9vw, 3rem); font-weight: 700; color: #005a9c; margin: 0; line-height: 1.15; letter-spacing: -1px;">
                     <div class="kinetic-text" style="animation-delay: 0.1s; display: block; font-weight: 600; font-size: 0.85em; margin-bottom: 4px;">Welcome to</div>
-                    <div class="kinetic-text" style="animation-delay: 0.3s; display: block;">MANSHAUL ULOOM</div>
-                    <div class="kinetic-text" style="animation-delay: 0.5s; display: block;">MADRASA</div>
+                    <div class="kinetic-text" style="animation-delay: 0.3s; display: block;">${instLine1}</div>
+                    <div class="kinetic-text" style="animation-delay: 0.5s; display: block;">${instLine2}</div>
                 </h1>
             </div>
             <div style="text-align: center; margin-bottom: 24px;">
@@ -139,11 +152,11 @@ const App = {
             <div class="metrics-grid">
                 <div class="metric-card">
                     <p>Collected</p>
-                    <div class="metric-value">₹${collectedBase}${collectedAdvance > 0 ? ` <span style="font-size: 0.6em; opacity: 0.8; font-weight: 500;">(+₹${collectedAdvance})</span>` : ''}</div>
+                    <div class="metric-value">₹${collectedBase.toLocaleString('en-IN')}${collectedAdvance > 0 ? ` <span style="font-size: 0.6em; opacity: 0.8; font-weight: 500;">(+₹${collectedAdvance.toLocaleString('en-IN')})</span>` : ''}</div>
                 </div>
                 <div class="metric-card outline">
                     <p>Pending</p>
-                    <div class="metric-value">₹${pendingAmount}</div>
+                    <div class="metric-value">₹${pendingAmount.toLocaleString('en-IN')}</div>
                 </div>
             </div>
             
@@ -159,16 +172,7 @@ const App = {
             </div>
             
             <div style="text-align: center; margin-top: 24px; display: flex; flex-direction: column; align-items: center; gap: 8px;">
-                <button class="btn" id="editTemplateBtn" style="background: var(--primary-600); color: white; padding: 10px 16px; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: space-between; width: 260px; transition: all 0.3s; opacity: 0.7;" onclick="if(window.isTemplateUnlocked) { App.openReceiptSettingsModal(); } else { UI.showToast('Please tap the lock icon to unlock editing.', 'info'); }">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <i data-lucide="image"></i> Edit Receipt Template
-                    </div>
-                    <div style="padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.2);" onclick="event.stopPropagation(); App.toggleTemplateLock()">
-                        <i data-lucide="lock" id="templateLockIcon" style="width: 16px; height: 16px; margin: 0;"></i>
-                    </div>
-                </button>
-                
-                <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 8px;">
+                <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
                     ${unsentMessages.length > 0 ? `
                         <button class="btn" style="position: relative; padding: 10px 16px; font-size: 0.9rem; background: #25D366; color: white; border-radius: 12px; border: none; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3); transition: transform 0.2s;" onclick="App.openUnsentReceiptsModal()" onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform='scale(1)'" onmouseleave="this.style.transform='scale(1)'">
                             <i data-lucide="message-circle" style="width: 18px; height: 18px;"></i> 
@@ -278,6 +282,23 @@ const App = {
             icon.setAttribute('data-lucide', 'lock');
             btn.style.opacity = '0.7';
             UI.showToast('Template editing locked.', 'info');
+        }
+        lucide.createIcons({ root: btn });
+    },
+
+    toggleDangerLock() {
+        window.isDangerUnlocked = !window.isDangerUnlocked;
+        const icon = document.getElementById('dangerLockIcon');
+        const btn = document.getElementById('dangerZoneBtn');
+        
+        if (window.isDangerUnlocked) {
+            icon.setAttribute('data-lucide', 'unlock');
+            btn.style.opacity = '1';
+            UI.showToast('Danger zone unlocked!', 'warning');
+        } else {
+            icon.setAttribute('data-lucide', 'lock');
+            btn.style.opacity = '0.7';
+            UI.showToast('Danger zone locked.', 'info');
         }
         lucide.createIcons({ root: btn });
     },
@@ -497,13 +518,19 @@ const App = {
             if (filteredParents.length === 0) {
                 html += `<p class="text-center text-muted">No parents found in this class.</p>`;
             } else {
-                // Display parents in the order they were added
+                // Sort by serial number or fallback to original index
+                filteredParents.sort((a, b) => {
+                    const snA = a.serialNo !== undefined ? a.serialNo : (parents.indexOf(a) + 1);
+                    const snB = b.serialNo !== undefined ? b.serialNo : (parents.indexOf(b) + 1);
+                    return snA - snB;
+                });
+
                 filteredParents.forEach((p) => {
-                    const originalIndex = parents.indexOf(p);
+                    const displaySerial = p.serialNo !== undefined ? p.serialNo : (parents.indexOf(p) + 1);
                     html += `
                         <div class="list-item parent-item" data-name="${p.parentName.toLowerCase()}" data-phone="${p.whatsappNumber}">
                             <div class="list-item-content">
-                                <h3>${originalIndex + 1}. ${p.parentName} ${p.studentName ? `<span style="font-weight: 300; font-size: 0.85em;">(${p.studentName})</span>` : ''}</h3>
+                                <h3>${displaySerial}. ${p.parentName} ${p.studentName ? `<span style="font-weight: 300; font-size: 0.85em;">(${p.studentName})</span>` : ''}</h3>
                                 <p>${p.whatsappNumber ? p.whatsappNumber : '<i data-lucide="phone-off" style="width: 14px; height: 14px; color: var(--danger); vertical-align: text-bottom; margin-right: 2px;"></i><span style="color: var(--danger); font-size: 0.9em;">No Phone</span>'} • ₹${p.monthlyFee}/mo</p>
                             </div>
                         <div class="flex gap-2" style="align-items: center;">
@@ -548,10 +575,25 @@ const App = {
 
     async openAddParentModal() {
         const classes = await db.classes.toArray();
-        let classOpts = classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        const parents = await db.parents.toArray();
+        let maxSerial = 0;
+        parents.forEach((p, index) => {
+            const sn = p.serialNo !== undefined ? Number(p.serialNo) : (index + 1);
+            if (sn > maxSerial) maxSerial = sn;
+        });
+        const nextSerial = maxSerial + 1;
+
+        let classOpts = classes.map(c => {
+            const isSelected = window.currentClassFilter === c.id ? 'selected' : '';
+            return `<option value="${c.id}" ${isSelected}>${c.name}</option>`;
+        }).join('');
         
         const content = `
             <form id="addParentForm">
+                <div class="form-group">
+                    <label>Serial Number</label>
+                    <input type="number" name="serialNo" class="form-control" value="${nextSerial}" required>
+                </div>
                 <div class="form-group">
                     <label>Parent Name *</label>
                     <input type="text" name="parentName" class="form-control" required>
@@ -584,6 +626,7 @@ const App = {
                 const fd = new FormData(e.target);
                 try {
                     const newId = await db.parents.add({
+                        serialNo: Number(fd.get('serialNo')),
                         parentName: fd.get('parentName'),
                         studentName: fd.get('studentName'),
                         classId: fd.get('classId'),
@@ -615,10 +658,18 @@ const App = {
     async editParent(id) {
         const parent = await db.parents.get(id);
         const classes = await db.classes.toArray();
+        const parents = await db.parents.toArray();
+        const defaultSerial = parents.findIndex(p => p.id === id) + 1;
+        const currentSerial = parent.serialNo !== undefined ? parent.serialNo : defaultSerial;
+        
         let classOpts = classes.map(c => `<option value="${c.id}" ${c.id === parent.classId ? 'selected' : ''}>${c.name}</option>`).join('');
         
         const content = `
             <form id="editParentForm">
+                <div class="form-group">
+                    <label>Serial Number</label>
+                    <input type="number" name="serialNo" class="form-control" value="${currentSerial}" required>
+                </div>
                 <div class="form-group">
                     <label>Parent Name *</label>
                     <input type="text" name="parentName" class="form-control" value="${parent.parentName}" required>
@@ -651,6 +702,7 @@ const App = {
                 const fd = new FormData(e.target);
                 try {
                     await db.parents.update(id, {
+                        serialNo: Number(fd.get('serialNo')),
                         parentName: fd.get('parentName'),
                         studentName: fd.get('studentName'),
                         classId: fd.get('classId'),
@@ -694,13 +746,16 @@ const App = {
         const classes = await db.classes.toArray();
         
         // Map data to match order of adding parents
-        const enriched = parents.map((parent, index) => {
+        let enriched = parents.map((parent, index) => {
             const pay = payments.find(p => p.parentId === parent.id);
             if (!pay) return null;
             const cls = classes.find(c => c.id === parent.classId) || {};
             const hasPastDue = pastPending.some(p => p.parentId === parent.id);
-            return { ...pay, parent, className: cls.name, serialNo: index + 1, hasPastDue };
+            const serialNo = parent.serialNo !== undefined ? parent.serialNo : (index + 1);
+            return { ...pay, parent, className: cls.name, serialNo: serialNo, hasPastDue };
         }).filter(p => p !== null);
+        
+        enriched.sort((a, b) => a.serialNo - b.serialNo);
         
         // State for filters
         window.currentPaymentFilter = window.currentPaymentFilter || 'Pending';
@@ -1446,11 +1501,42 @@ const App = {
         const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
         const lucideIcon = currentTheme === 'dark' ? 'sun' : 'moon';
 
+        let globalSettings = await db.settings.get('receiptSettings') || {};
+        try {
+            const localSaved = localStorage.getItem('receiptSettings');
+            if(localSaved && !globalSettings.nextReceiptNumber) {
+                globalSettings = JSON.parse(localSaved);
+            }
+        } catch(e) {}
+        const instLine1 = globalSettings.instLine1 || 'MANSHAUL ULOOM';
+        const instLine2 = globalSettings.instLine2 || 'MADRASA';
+
         container.innerHTML = `
             <div style="margin-bottom: 20px; text-align: center;">
                 <h2 style="margin-bottom: 16px;">Settings</h2>
             </div>
             
+            <div class="card mt-4">
+                <h3>Dashboard Display</h3>
+                <p class="text-muted mb-4">Customize the institution name shown on the dashboard.</p>
+                <button class="btn btn-secondary" onclick="App.openDashboardDisplayModal()">
+                    <i data-lucide="edit-3"></i> Edit Institution Name
+                </button>
+            </div>
+
+            <div class="card mt-4">
+                <h3>Receipt Template</h3>
+                <p class="text-muted mb-4">Customize the visual template and coordinates for generating receipts.</p>
+                <button class="btn" id="editTemplateBtn" style="background: var(--primary-600); color: white; transition: all 0.3s; opacity: ${window.isTemplateUnlocked ? '1' : '0.7'}; display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 10px 16px;" onclick="if(window.isTemplateUnlocked) { App.openReceiptSettingsModal(); } else { UI.showToast('Please tap the lock icon to unlock editing.', 'info'); }">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i data-lucide="image"></i> Edit Receipt Template
+                    </div>
+                    <div style="padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.2);" onclick="event.stopPropagation(); App.toggleTemplateLock()">
+                        <i data-lucide="${window.isTemplateUnlocked ? 'unlock' : 'lock'}" id="templateLockIcon" style="width: 16px; height: 16px; margin: 0;"></i>
+                    </div>
+                </button>
+            </div>
+
             <div class="card mt-4">
                 <h3>App Preferences</h3>
                 <div class="flex justify-between align-center mt-2">
@@ -1481,13 +1567,61 @@ const App = {
             <div class="card mt-4" style="border: 1px solid var(--danger); background: rgba(239, 68, 68, 0.05);">
                 <h3 style="color: var(--danger);">Danger Zone</h3>
                 <p class="text-muted mb-4">Permanently delete all parents and payment records. This cannot be undone.</p>
-                <button class="btn" style="background: var(--danger); color: white; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3);" onclick="App.clearDatabase()">
-                    <i data-lucide="trash-2"></i> Clear Database Completely
+                <button class="btn" id="dangerZoneBtn" style="background: var(--danger); color: white; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3); opacity: ${window.isDangerUnlocked ? '1' : '0.7'}; display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 10px 16px;" onclick="if(window.isDangerUnlocked) { App.clearDatabase(); } else { UI.showToast('Please tap the lock icon to unlock this action.', 'info'); }">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i data-lucide="trash-2"></i> Clear Database Completely
+                    </div>
+                    <div style="padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.2);" onclick="event.stopPropagation(); App.toggleDangerLock()">
+                        <i data-lucide="${window.isDangerUnlocked ? 'unlock' : 'lock'}" id="dangerLockIcon" style="width: 16px; height: 16px; margin: 0;"></i>
+                    </div>
                 </button>
             </div>
         `;
         
         lucide.createIcons({ root: container });
+    },
+
+    async openDashboardDisplayModal() {
+        let globalSettings = await db.settings.get('receiptSettings') || {};
+        try {
+            const localSaved = localStorage.getItem('receiptSettings');
+            if(localSaved && !globalSettings.nextReceiptNumber) {
+                globalSettings = JSON.parse(localSaved);
+            }
+        } catch(e) {}
+        const instLine1 = globalSettings.instLine1 || 'MANSHAUL ULOOM';
+        const instLine2 = globalSettings.instLine2 || 'MADRASA';
+        
+        const content = `
+            <form id="dashboardDisplayForm">
+                <div class="form-group">
+                    <label>Institution Name Line 1</label>
+                    <input type="text" name="instLine1" class="form-control" value="${instLine1}" required>
+                </div>
+                <div class="form-group">
+                    <label>Institution Name Line 2</label>
+                    <input type="text" name="instLine2" class="form-control" value="${instLine2}">
+                </div>
+                <button type="submit" class="btn btn-primary mt-4">Save Names</button>
+            </form>
+        `;
+        
+        UI.openModal('Edit Institution Name', content, (modal, closeFunc) => {
+            modal.querySelector('#dashboardDisplayForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const fd = new FormData(e.target);
+                
+                let globalSettings = await db.settings.get('receiptSettings') || {};
+                globalSettings.instLine1 = fd.get('instLine1');
+                globalSettings.instLine2 = fd.get('instLine2');
+                
+                await db.settings.set('receiptSettings', globalSettings);
+                localStorage.setItem('receiptSettings', JSON.stringify(globalSettings));
+                
+                UI.showToast('Dashboard names saved!', 'success');
+                closeFunc();
+            });
+        });
     },
 
     async clearDatabase() {
@@ -1624,9 +1758,14 @@ const App = {
             </div>
             
             <div class="flex gap-4" style="flex-direction: column; margin-top: 16px;">
-                <button class="btn btn-primary" style="background: var(--primary-600); color: white; border: none;" onclick="App.generateStatusPoster(document.getElementById('posterDateInput').value)">
-                    <i data-lucide="download"></i> Download Poster
-                </button>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-primary" style="background: var(--primary-600); color: white; border: none; flex: 1;" onclick="App.generateStatusPoster(document.getElementById('posterDateInput').value, true)">
+                        <i data-lucide="eye"></i> Preview
+                    </button>
+                    <button class="btn btn-primary" style="background: var(--primary-600); color: white; border: none; flex: 1;" onclick="App.generateStatusPoster(document.getElementById('posterDateInput').value, false)">
+                        <i data-lucide="download"></i> Download
+                    </button>
+                </div>
                 <button class="btn btn-secondary" onclick="App.openPosterSettingsModal()">
                     <i data-lucide="settings"></i> Edit Poster Template
                 </button>
@@ -1853,7 +1992,7 @@ const App = {
         });
     },
 
-    async generateStatusPoster(dateText) {
+    async generateStatusPoster(dateText, previewOnly = false) {
         let settings = {
             template: '',
             chartX: 0.5, chartY: 0.65, chartScale: 1.0,
@@ -1980,6 +2119,13 @@ const App = {
             ctx.fillText(dText, w * settings.dateX, h * settings.dateY);
             
             const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+            
+            if (previewOnly) {
+                const previewHtml = `<img src="${dataUrl}" style="max-width:100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">`;
+                UI.openModal('Poster Preview', previewHtml);
+                return;
+            }
+            
             const link = document.createElement('a');
             link.href = dataUrl;
             link.download = `Status_Poster_${currentMonth}.jpg`;
