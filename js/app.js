@@ -307,10 +307,16 @@ const App = {
         // Load existing settings
         let settings = {
             nextReceiptNumber: 1,
+            fontSizeScale: 1.0,
+            fontFamily: 'Outfit',
             receiptNoX: 0.44, receiptNoY: 0.323,
-            startX: 0.52,
-            nameY: 0.473, monthY: 0.527, amountY: 0.582, wordsY: 0.638,
-            dateY: 0.693, methodY: 0.748, remarksY: 0.803,
+            nameX: 0.52, nameY: 0.473,
+            monthX: 0.52, monthY: 0.527,
+            amountX: 0.52, amountY: 0.582,
+            wordsX: 0.52, wordsY: 0.638,
+            dateX: 0.52, dateY: 0.693,
+            methodX: 0.52, methodY: 0.748,
+            remarksX: 0.52, remarksY: 0.803,
             template: 'receipt-template.png'
         };
         
@@ -344,13 +350,30 @@ const App = {
                 <div class="metrics-grid" style="grid-template-columns: 1fr 1fr; gap: 8px;">
                     <div class="form-group"><label>Receipt No (X)</label><input type="number" step="0.001" name="receiptNoX" class="form-control" value="${settings.receiptNoX}"></div>
                     <div class="form-group"><label>Receipt No (Y)</label><input type="number" step="0.001" name="receiptNoY" class="form-control" value="${settings.receiptNoY}"></div>
-                    <div class="form-group" style="grid-column: span 2;"><label>Main Fields Start (X)</label><input type="number" step="0.001" name="startX" class="form-control" value="${settings.startX}"></div>
+                    <div class="form-group"><label>Font Size Scale</label><input type="number" step="0.05" name="fontSizeScale" class="form-control" value="${settings.fontSizeScale || 1.0}"></div>
+                    <div class="form-group"><label>Font Family</label>
+                        <select name="fontFamily" class="form-control">
+                            <option value="Outfit" ${settings.fontFamily === 'Outfit' ? 'selected' : ''}>Outfit</option>
+                            <option value="Arial" ${settings.fontFamily === 'Arial' ? 'selected' : ''}>Arial</option>
+                            <option value="'Times New Roman'" ${settings.fontFamily === "'Times New Roman'" ? 'selected' : ''}>Times New Roman</option>
+                            <option value="Courier" ${settings.fontFamily === 'Courier' ? 'selected' : ''}>Courier</option>
+                            <option value="Verdana" ${settings.fontFamily === 'Verdana' ? 'selected' : ''}>Verdana</option>
+                            <option value="Georgia" ${settings.fontFamily === 'Georgia' ? 'selected' : ''}>Georgia</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Parent Name (X)</label><input type="number" step="0.001" name="nameX" class="form-control" value="${settings.nameX}"></div>
                     <div class="form-group"><label>Parent Name (Y)</label><input type="number" step="0.001" name="nameY" class="form-control" value="${settings.nameY}"></div>
+                    <div class="form-group"><label>Month (X)</label><input type="number" step="0.001" name="monthX" class="form-control" value="${settings.monthX}"></div>
                     <div class="form-group"><label>Month (Y)</label><input type="number" step="0.001" name="monthY" class="form-control" value="${settings.monthY}"></div>
+                    <div class="form-group"><label>Amount (X)</label><input type="number" step="0.001" name="amountX" class="form-control" value="${settings.amountX}"></div>
                     <div class="form-group"><label>Amount (Y)</label><input type="number" step="0.001" name="amountY" class="form-control" value="${settings.amountY}"></div>
-                    <div class="form-group"><label>Amount in Words (Y)</label><input type="number" step="0.001" name="wordsY" class="form-control" value="${settings.wordsY}"></div>
+                    <div class="form-group"><label>Words (X)</label><input type="number" step="0.001" name="wordsX" class="form-control" value="${settings.wordsX}"></div>
+                    <div class="form-group"><label>Words (Y)</label><input type="number" step="0.001" name="wordsY" class="form-control" value="${settings.wordsY}"></div>
+                    <div class="form-group"><label>Date (X)</label><input type="number" step="0.001" name="dateX" class="form-control" value="${settings.dateX}"></div>
                     <div class="form-group"><label>Date (Y)</label><input type="number" step="0.001" name="dateY" class="form-control" value="${settings.dateY}"></div>
+                    <div class="form-group"><label>Method (X)</label><input type="number" step="0.001" name="methodX" class="form-control" value="${settings.methodX}"></div>
                     <div class="form-group"><label>Method (Y)</label><input type="number" step="0.001" name="methodY" class="form-control" value="${settings.methodY}"></div>
+                    <div class="form-group"><label>Remarks (X)</label><input type="number" step="0.001" name="remarksX" class="form-control" value="${settings.remarksX}"></div>
                     <div class="form-group"><label>Remarks (Y)</label><input type="number" step="0.001" name="remarksY" class="form-control" value="${settings.remarksY}"></div>
                 </div>
                 <button type="submit" class="btn btn-primary mt-4">Save Receipt Settings</button>
@@ -374,27 +397,30 @@ const App = {
                     
                     const w = canvas.width;
                     const h = canvas.height;
-                    const fontSize = w * 0.024;
-                    ctx.font = `600 ${fontSize}px "Outfit", sans-serif`;
+                    
+                    const fd = new FormData(form);
+                    const scale = Number(fd.get('fontSizeScale')) || 1.0;
+                    const fontF = fd.get('fontFamily') || 'Outfit';
+                    
+                    const fontSize = w * 0.024 * scale;
+                    ctx.font = `600 ${fontSize}px ${fontF}, sans-serif`;
                     ctx.fillStyle = '#0f172a';
                     ctx.textAlign = 'left';
 
-                    const fd = new FormData(form);
                     const rx = Number(fd.get('receiptNoX')) || 0;
                     const ry = Number(fd.get('receiptNoY')) || 0;
-                    const sx = Number(fd.get('startX')) || 0;
 
                     const previewReceiptNo = fd.get('nextReceiptNumber') || '1';
                     ctx.fillText(previewReceiptNo, w * rx, h * ry);
 
                     const lines = [
-                        { y: Number(fd.get('nameY')) || 0, text: 'Student Name' },
-                        { y: Number(fd.get('monthY')) || 0, text: formatMonthYear('2026-07') },
-                        { y: Number(fd.get('amountY')) || 0, text: 'Rs. 1000/-' },
-                        { y: Number(fd.get('wordsY')) || 0, text: 'One Thousand Only' },
-                        { y: Number(fd.get('dateY')) || 0, text: '05-Jul-2026' },
-                        { y: Number(fd.get('methodY')) || 0, text: 'Cash' },
-                        { y: Number(fd.get('remarksY')) || 0, text: 'Jazakkallah', isRemarks: true }
+                        { x: Number(fd.get('nameX')) || 0, y: Number(fd.get('nameY')) || 0, text: 'Student Name' },
+                        { x: Number(fd.get('monthX')) || 0, y: Number(fd.get('monthY')) || 0, text: formatMonthYear('2026-07') },
+                        { x: Number(fd.get('amountX')) || 0, y: Number(fd.get('amountY')) || 0, text: 'Rs. 1000/-' },
+                        { x: Number(fd.get('wordsX')) || 0, y: Number(fd.get('wordsY')) || 0, text: 'One Thousand Only' },
+                        { x: Number(fd.get('dateX')) || 0, y: Number(fd.get('dateY')) || 0, text: '05-Jul-2026' },
+                        { x: Number(fd.get('methodX')) || 0, y: Number(fd.get('methodY')) || 0, text: 'Cash' },
+                        { x: Number(fd.get('remarksX')) || 0, y: Number(fd.get('remarksY')) || 0, text: 'Jazakkallah', isRemarks: true }
                     ];
 
                     lines.forEach(line => {
@@ -403,7 +429,7 @@ const App = {
                         } else {
                             ctx.fillStyle = '#0f172a';
                         }
-                        ctx.fillText(line.text, w * sx, h * line.y);
+                        ctx.fillText(line.text, w * line.x, h * line.y);
                     });
                 };
                 img.src = base64Template;
@@ -432,15 +458,23 @@ const App = {
                 const fd = new FormData(e.target);
                 const newSettings = {
                     nextReceiptNumber: Number(fd.get('nextReceiptNumber')),
+                    fontSizeScale: Number(fd.get('fontSizeScale')) || 1.0,
+                    fontFamily: fd.get('fontFamily') || 'Outfit',
                     receiptNoX: Number(fd.get('receiptNoX')),
                     receiptNoY: Number(fd.get('receiptNoY')),
-                    startX: Number(fd.get('startX')),
+                    nameX: Number(fd.get('nameX')),
                     nameY: Number(fd.get('nameY')),
+                    monthX: Number(fd.get('monthX')),
                     monthY: Number(fd.get('monthY')),
+                    amountX: Number(fd.get('amountX')),
                     amountY: Number(fd.get('amountY')),
+                    wordsX: Number(fd.get('wordsX')),
                     wordsY: Number(fd.get('wordsY')),
+                    dateX: Number(fd.get('dateX')),
                     dateY: Number(fd.get('dateY')),
+                    methodX: Number(fd.get('methodX')),
                     methodY: Number(fd.get('methodY')),
+                    remarksX: Number(fd.get('remarksX')),
                     remarksY: Number(fd.get('remarksY')),
                     template: base64Template
                 };
@@ -1102,7 +1136,14 @@ const App = {
             try {
                 const payment = await db.payments.get(paymentId);
                 const parent = await db.parents.get(payment.parentId);
-                let settings = { receiptNoX: 0.44, receiptNoY: 0.323, startX: 0.52, nameY: 0.473, monthY: 0.527, amountY: 0.582, wordsY: 0.638, dateY: 0.693, methodY: 0.748, remarksY: 0.803, template: 'receipt-template.png' };
+                let settings = {
+                    fontSizeScale: 1.0, fontFamily: 'Outfit',
+                    receiptNoX: 0.44, receiptNoY: 0.323,
+                    nameX: 0.52, nameY: 0.473, monthX: 0.52, monthY: 0.527,
+                    amountX: 0.52, amountY: 0.582, wordsX: 0.52, wordsY: 0.638,
+                    dateX: 0.52, dateY: 0.693, methodX: 0.52, methodY: 0.748,
+                    remarksX: 0.52, remarksY: 0.803, template: 'receipt-template.png'
+                };
                 try {
                     let globalSaved = await db.settings.get('receiptSettings');
                     if (!globalSaved) {
@@ -1120,18 +1161,23 @@ const App = {
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     const w = canvas.width; const h = canvas.height;
-                    ctx.font = `600 ${w * 0.024}px "Outfit", sans-serif`;
+                    const scale = settings.fontSizeScale || 1.0;
+                    const fontF = settings.fontFamily || 'Outfit';
+                    ctx.font = `600 ${w * 0.024 * scale}px ${fontF}, sans-serif`;
                     ctx.fillStyle = '#0f172a'; ctx.textAlign = 'left';
                     ctx.fillText(payment.receiptNo, w * settings.receiptNoX, h * settings.receiptNoY);
                     const lines = [
-                        { y: settings.nameY, text: parent.parentName }, { y: settings.monthY, text: payment.receiptMonthOverride || formatMonthYear(payment.month) },
-                        { y: settings.amountY, text: `Rs. ${payment.amount}/-` }, { y: settings.wordsY, text: App.amountToWords(payment.amount) },
-                        { y: settings.dateY, text: formatDate(payment.date) }, { y: settings.methodY, text: payment.method },
-                        { y: settings.remarksY, text: payment.remarks || 'Jazakkallah', isRemarks: true }
+                        { x: settings.nameX, y: settings.nameY, text: parent.parentName },
+                        { x: settings.monthX, y: settings.monthY, text: payment.receiptMonthOverride || formatMonthYear(payment.month) },
+                        { x: settings.amountX, y: settings.amountY, text: `Rs. ${payment.amount}/-` },
+                        { x: settings.wordsX, y: settings.wordsY, text: App.amountToWords(payment.amount) },
+                        { x: settings.dateX, y: settings.dateY, text: formatDate(payment.date) },
+                        { x: settings.methodX, y: settings.methodY, text: payment.method },
+                        { x: settings.remarksX, y: settings.remarksY, text: payment.remarks || 'Jazakkallah', isRemarks: true }
                     ];
                     lines.forEach(line => {
                         ctx.fillStyle = line.isRemarks ? '#16a34a' : '#0f172a';
-                        ctx.fillText(line.text, w * settings.startX, h * line.y);
+                        ctx.fillText(line.text, w * (line.x || 0.52), h * (line.y || 0));
                     });
                     canvas.toBlob(resolve, 'image/jpeg', 0.95);
                 };
@@ -1306,10 +1352,16 @@ const App = {
             const cls = await db.classes.get(parent.classId);
             
             let settings = {
+                fontSizeScale: 1.0,
+                fontFamily: 'Outfit',
                 receiptNoX: 0.44, receiptNoY: 0.323,
-                startX: 0.52,
-                nameY: 0.473, monthY: 0.527, amountY: 0.582, wordsY: 0.638,
-                dateY: 0.693, methodY: 0.748, remarksY: 0.803,
+                nameX: 0.52, nameY: 0.473,
+                monthX: 0.52, monthY: 0.527,
+                amountX: 0.52, amountY: 0.582,
+                wordsX: 0.52, wordsY: 0.638,
+                dateX: 0.52, dateY: 0.693,
+                methodX: 0.52, methodY: 0.748,
+                remarksX: 0.52, remarksY: 0.803,
                 template: 'receipt-template.png'
             };
             
@@ -1339,22 +1391,23 @@ const App = {
                 
                 const w = canvas.width;
                 const h = canvas.height;
-                const fontSize = w * 0.024;
-                ctx.font = `600 ${fontSize}px "Outfit", sans-serif`;
+                const scale = settings.fontSizeScale || 1.0;
+                const fontF = settings.fontFamily || 'Outfit';
+                const fontSize = w * 0.024 * scale;
+                ctx.font = `600 ${fontSize}px ${fontF}, sans-serif`;
                 ctx.fillStyle = '#0f172a';
                 ctx.textAlign = 'left';
                 
                 ctx.fillText(payment.receiptNo, w * settings.receiptNoX, h * settings.receiptNoY);
                 
-                const startX = w * settings.startX;
                 const lines = [
-                    { y: settings.nameY, text: parent.parentName },
-                    { y: settings.monthY, text: payment.receiptMonthOverride || formatMonthYear(payment.month) },
-                    { y: settings.amountY, text: `Rs. ${payment.amount}/-` },
-                    { y: settings.wordsY, text: App.amountToWords(payment.amount) },
-                    { y: settings.dateY, text: formatDate(payment.date) },
-                    { y: settings.methodY, text: payment.method },
-                    { y: settings.remarksY, text: payment.remarks || 'Jazakkallah', isRemarks: true }
+                    { x: settings.nameX, y: settings.nameY, text: parent.parentName },
+                    { x: settings.monthX, y: settings.monthY, text: payment.receiptMonthOverride || formatMonthYear(payment.month) },
+                    { x: settings.amountX, y: settings.amountY, text: `Rs. ${payment.amount}/-` },
+                    { x: settings.wordsX, y: settings.wordsY, text: App.amountToWords(payment.amount) },
+                    { x: settings.dateX, y: settings.dateY, text: formatDate(payment.date) },
+                    { x: settings.methodX, y: settings.methodY, text: payment.method },
+                    { x: settings.remarksX, y: settings.remarksY, text: payment.remarks || 'Jazakkallah', isRemarks: true }
                 ];
                 
                 lines.forEach(line => {
@@ -1363,7 +1416,7 @@ const App = {
                     } else {
                         ctx.fillStyle = '#0f172a';
                     }
-                    ctx.fillText(line.text, startX, h * line.y);
+                    ctx.fillText(line.text, w * (line.x || 0.52), h * (line.y || 0));
                 });
                 
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
