@@ -316,7 +316,6 @@ const App = {
             wordsX: 0.52, wordsY: 0.638,
             dateX: 0.52, dateY: 0.693,
             methodX: 0.52, methodY: 0.748,
-            remarksX: 0.52, remarksY: 0.803,
             template: 'receipt-template.png'
         };
         
@@ -373,8 +372,6 @@ const App = {
                     <div class="form-group"><label>Date (Y)</label><input type="number" step="0.001" name="dateY" class="form-control" value="${settings.dateY}"></div>
                     <div class="form-group"><label>Method (X)</label><input type="number" step="0.001" name="methodX" class="form-control" value="${settings.methodX}"></div>
                     <div class="form-group"><label>Method (Y)</label><input type="number" step="0.001" name="methodY" class="form-control" value="${settings.methodY}"></div>
-                    <div class="form-group"><label>Remarks (X)</label><input type="number" step="0.001" name="remarksX" class="form-control" value="${settings.remarksX}"></div>
-                    <div class="form-group"><label>Remarks (Y)</label><input type="number" step="0.001" name="remarksY" class="form-control" value="${settings.remarksY}"></div>
                 </div>
                 <button type="submit" class="btn btn-primary mt-4">Save Receipt Settings</button>
                 <button type="button" class="btn btn-secondary mt-2" onclick="App.resetReceiptSettings()">Reset to Defaults</button>
@@ -419,8 +416,7 @@ const App = {
                         { x: Number(fd.get('amountX')) || 0, y: Number(fd.get('amountY')) || 0, text: 'Rs. 1000/-' },
                         { x: Number(fd.get('wordsX')) || 0, y: Number(fd.get('wordsY')) || 0, text: 'One Thousand Only' },
                         { x: Number(fd.get('dateX')) || 0, y: Number(fd.get('dateY')) || 0, text: '05-Jul-2026' },
-                        { x: Number(fd.get('methodX')) || 0, y: Number(fd.get('methodY')) || 0, text: 'Cash' },
-                        { x: Number(fd.get('remarksX')) || 0, y: Number(fd.get('remarksY')) || 0, text: 'Jazakkallah', isRemarks: true }
+                        { x: Number(fd.get('methodX')) || 0, y: Number(fd.get('methodY')) || 0, text: 'Cash' }
                     ];
 
                     lines.forEach(line => {
@@ -474,8 +470,6 @@ const App = {
                     dateY: Number(fd.get('dateY')),
                     methodX: Number(fd.get('methodX')),
                     methodY: Number(fd.get('methodY')),
-                    remarksX: Number(fd.get('remarksX')),
-                    remarksY: Number(fd.get('remarksY')),
                     template: base64Template
                 };
                 
@@ -1142,7 +1136,7 @@ const App = {
                     nameX: 0.52, nameY: 0.473, monthX: 0.52, monthY: 0.527,
                     amountX: 0.52, amountY: 0.582, wordsX: 0.52, wordsY: 0.638,
                     dateX: 0.52, dateY: 0.693, methodX: 0.52, methodY: 0.748,
-                    remarksX: 0.52, remarksY: 0.803, template: 'receipt-template.png'
+                    template: 'receipt-template.png'
                 };
                 try {
                     let globalSaved = await db.settings.get('receiptSettings');
@@ -1172,8 +1166,7 @@ const App = {
                         { x: settings.amountX, y: settings.amountY, text: `Rs. ${payment.amount}/-` },
                         { x: settings.wordsX, y: settings.wordsY, text: App.amountToWords(payment.amount) },
                         { x: settings.dateX, y: settings.dateY, text: formatDate(payment.date) },
-                        { x: settings.methodX, y: settings.methodY, text: payment.method },
-                        { x: settings.remarksX, y: settings.remarksY, text: payment.remarks || 'Jazakkallah', isRemarks: true }
+                        { x: settings.methodX, y: settings.methodY, text: payment.method }
                     ];
                     lines.forEach(line => {
                         ctx.fillStyle = line.isRemarks ? '#16a34a' : '#0f172a';
@@ -1361,7 +1354,6 @@ const App = {
                 wordsX: 0.52, wordsY: 0.638,
                 dateX: 0.52, dateY: 0.693,
                 methodX: 0.52, methodY: 0.748,
-                remarksX: 0.52, remarksY: 0.803,
                 template: 'receipt-template.png'
             };
             
@@ -1406,8 +1398,7 @@ const App = {
                     { x: settings.amountX, y: settings.amountY, text: `Rs. ${payment.amount}/-` },
                     { x: settings.wordsX, y: settings.wordsY, text: App.amountToWords(payment.amount) },
                     { x: settings.dateX, y: settings.dateY, text: formatDate(payment.date) },
-                    { x: settings.methodX, y: settings.methodY, text: payment.method },
-                    { x: settings.remarksX, y: settings.remarksY, text: payment.remarks || 'Jazakkallah', isRemarks: true }
+                    { x: settings.methodX, y: settings.methodY, text: payment.method }
                 ];
                 
                 lines.forEach(line => {
