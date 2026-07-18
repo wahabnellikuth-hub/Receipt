@@ -257,7 +257,10 @@ const App = {
                             <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">${item.payment.receiptNo} • ₹${item.payment.amount}</p>
                         </div>
                         <div style="display: flex; gap: 8px;">
-                            <button class="btn" style="width: 40px; height: 40px; padding: 0; border-radius: 50%; background: #25D366; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.4); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="App.openWhatsApp('${item.payment.id}'); this.style.display='none';" title="Open WhatsApp">
+                            <button type="button" class="btn btn-secondary" style="width: 40px; height: 40px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="App.viewReceipt('${item.payment.id}')" title="View Receipt">
+                                <i data-lucide="eye" style="width: 20px; height: 20px; margin: 0;"></i>
+                            </button>
+                            <button type="button" class="btn" style="width: 40px; height: 40px; padding: 0; border-radius: 50%; background: #25D366; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.4); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="App.openWhatsApp('${item.payment.id}'); this.style.display='none';" title="Open WhatsApp">
                                 <i data-lucide="message-circle" style="width: 20px; height: 20px; color: white; margin: 0;"></i>
                             </button>
                         </div>
