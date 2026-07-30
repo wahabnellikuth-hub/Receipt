@@ -253,7 +253,7 @@ const App = {
             </div>
             <button class="btn btn-primary" style="width: 100%; margin-bottom: 16px;" onclick="App.generateStatusText()">View</button>
             <div id="statusTextOutput" style="display: none; flex-direction: column; gap: 8px;">
-                <textarea id="generatedStatusText" class="form-control" rows="15" readonly style="font-family: monospace; font-size: 0.9em; resize: none;"></textarea>
+                <textarea id="generatedStatusText" class="form-control" rows="15" style="font-family: monospace; font-size: 0.9em; resize: vertical;"></textarea>
                 <button class="btn" style="width: 100%; background: #25D366; color: white;" onclick="App.copyStatusText()">
                     <i data-lucide="copy"></i> Copy Text
                 </button>
