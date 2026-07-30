@@ -184,6 +184,10 @@ const App = {
                         <i data-lucide="bar-chart-2" style="width: 18px; height: 18px;"></i> 
                         Status Poster
                     </button>
+                    <button class="btn" style="padding: 10px 16px; font-size: 0.9rem; background: #3b82f6; color: white; border-radius: 12px; border: none; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: transform 0.2s;" onclick="App.openStatusTextModal()" onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform='scale(1)'" onmouseleave="this.style.transform='scale(1)'">
+                        <i data-lucide="file-text" style="width: 18px; height: 18px;"></i> 
+                        Generate Status Text
+                    </button>
                 </div>
             </div>
             
@@ -228,6 +232,108 @@ const App = {
         }
         const next = `${year}-${String(month).padStart(2, '0')}`;
         await this.changeMonth(next);
+    },
+
+    async openStatusTextModal() {
+        const now = new Date();
+        const tzOffset = now.getTimezoneOffset() * 60000;
+        const localNow = new Date(now.getTime() - tzOffset);
+        
+        const defaultDate = localNow.toISOString().split('T')[0];
+        const defaultTime = localNow.toISOString().split('T')[1].slice(0, 5);
+
+        const content = `
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" id="statusDate" class="form-control" value="${defaultDate}">
+            </div>
+            <div class="form-group">
+                <label>Time</label>
+                <input type="time" id="statusTime" class="form-control" value="${defaultTime}">
+            </div>
+            <button class="btn btn-primary" style="width: 100%; margin-bottom: 16px;" onclick="App.generateStatusText()">View</button>
+            <div id="statusTextOutput" style="display: none; flex-direction: column; gap: 8px;">
+                <textarea id="generatedStatusText" class="form-control" rows="15" readonly style="font-family: monospace; font-size: 0.9em; resize: none;"></textarea>
+                <button class="btn" style="width: 100%; background: #25D366; color: white;" onclick="App.copyStatusText()">
+                    <i data-lucide="copy"></i> Copy Text
+                </button>
+            </div>
+        `;
+        UI.openModal('Generate Status Text', content);
+    },
+
+    async generateStatusText() {
+        const dateVal = document.getElementById('statusDate').value;
+        const timeVal = document.getElementById('statusTime').value;
+        
+        const dateObj = new Date(`${dateVal}T${timeVal}`);
+        let formattedDate = dateVal;
+        let formattedTime = timeVal;
+        
+        if (!isNaN(dateObj.getTime())) {
+            formattedDate = dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            let hours = dateObj.getHours();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; 
+            const minutes = dateObj.getMinutes().toString().padStart(2, '0');
+            formattedTime = `${hours}:${minutes} ${ampm}`;
+        } else {
+            const parts = dateVal.split('-');
+            if(parts.length === 3) formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+            
+            const tParts = timeVal.split(':');
+            if(tParts.length >= 2) {
+                let h = parseInt(tParts[0], 10);
+                const m = tParts[1];
+                const ampm = h >= 12 ? 'PM' : 'AM';
+                h = h % 12;
+                h = h ? h : 12;
+                formattedTime = `${h}:${m} ${ampm}`;
+            }
+        }
+
+        const currentMonth = getActiveMonth();
+        const payments = await db.payments.where('month').equals(currentMonth).toArray();
+        const parents = await db.parents.toArray();
+
+        let list = parents.map((parent, index) => {
+            const pay = payments.find(p => p.parentId === parent.id);
+            const status = pay && pay.status === 'Paid' ? '✅' : '❌';
+            const serialNo = parent.serialNo !== undefined ? parent.serialNo : (index + 1);
+            return { serialNo, name: parent.parentName, status };
+        });
+
+        list.sort((a, b) => a.serialNo - b.serialNo);
+
+        let text = `Last Updated: ${formattedDate} ${formattedTime}\n\n`;
+        text += `*${formatMonthYear(currentMonth)}*\n\n`;
+        list.forEach(item => {
+            text += `${item.serialNo}. ${item.status} ${item.name}\n`;
+        });
+
+        const outputDiv = document.getElementById('statusTextOutput');
+        const textarea = document.getElementById('generatedStatusText');
+        
+        textarea.value = text;
+        outputDiv.style.display = 'flex';
+        lucide.createIcons({ root: outputDiv });
+    },
+
+    async copyStatusText() {
+        const textarea = document.getElementById('generatedStatusText');
+        textarea.select();
+        textarea.setSelectionRange(0, 99999);
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(textarea.value);
+            } else {
+                document.execCommand('copy');
+            }
+            UI.showToast('Status text copied to clipboard!', 'success');
+        } catch (err) {
+            UI.showToast('Failed to copy text', 'error');
+        }
     },
 
     async openUnsentReceiptsModal() {
