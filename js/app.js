@@ -85,15 +85,25 @@ const App = {
         
         let collectedBase = 0;
         let collectedAdvance = 0;
+        let collectedUpi = 0;
+        let advanceApplied = 0;
         for (let p of paid) {
             const parent = parents.find(x => x.id === p.parentId);
             const fee = parent ? Number(parent.monthlyFee) : 0;
             const amt = Number(p.amount);
+            
+            if (amt === 0 && fee > 0) {
+                advanceApplied += fee;
+            }
+            
             if (amt > fee && fee > 0) {
                 collectedBase += fee;
                 collectedAdvance += (amt - fee);
             } else {
                 collectedBase += amt;
+            }
+            if (p.method === 'UPI') {
+                collectedUpi += amt;
             }
         }
         
@@ -153,6 +163,8 @@ const App = {
                 <div class="metric-card">
                     <p>Collected</p>
                     <div class="metric-value">₹${collectedBase.toLocaleString('en-IN')}${collectedAdvance > 0 ? ` <span style="font-size: 0.6em; opacity: 0.8; font-weight: 500;">(+₹${collectedAdvance.toLocaleString('en-IN')})</span>` : ''}</div>
+                    <div style="font-size: 0.85em; color: var(--success); margin-top: 4px; font-weight: 500;">UPI: ₹${collectedUpi.toLocaleString('en-IN')}</div>
+                    ${advanceApplied > 0 ? `<div style="font-size: 0.85em; color: var(--primary-600); margin-top: 4px; font-weight: 500;">Advance Applied: ₹${advanceApplied.toLocaleString('en-IN')}</div>` : ''}
                 </div>
                 <div class="metric-card outline">
                     <p>Pending</p>
