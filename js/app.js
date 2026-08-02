@@ -87,6 +87,7 @@ const App = {
         let collectedAdvance = 0;
         let collectedUpi = 0;
         let advanceApplied = 0;
+        let upiCount = 0;
         for (let p of paid) {
             const parent = parents.find(x => x.id === p.parentId);
             const fee = parent ? Number(parent.monthlyFee) : 0;
@@ -104,6 +105,7 @@ const App = {
             }
             if (p.method === 'UPI') {
                 collectedUpi += amt;
+                upiCount++;
             }
         }
         
@@ -163,8 +165,10 @@ const App = {
                 <div class="metric-card">
                     <p>Collected</p>
                     <div class="metric-value">₹${collectedBase.toLocaleString('en-IN')}${collectedAdvance > 0 ? ` <span style="font-size: 0.6em; opacity: 0.8; font-weight: 500;">(+₹${collectedAdvance.toLocaleString('en-IN')})</span>` : ''}</div>
-                    <div style="font-size: 0.85em; color: var(--success); margin-top: 4px; font-weight: 500;">UPI: ₹${collectedUpi.toLocaleString('en-IN')}</div>
-                    ${advanceApplied > 0 ? `<div style="font-size: 0.85em; color: var(--primary-600); margin-top: 4px; font-weight: 500;">Advance Applied: ₹${advanceApplied.toLocaleString('en-IN')}</div>` : ''}
+                    <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px; align-items: center;">
+                        <div style="font-size: 0.85em; color: #fff; background: #8b5cf6; padding: 4px 12px; border-radius: 20px; font-weight: 600; box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);">UPI: ₹${collectedUpi.toLocaleString('en-IN')}</div>
+                        ${advanceApplied > 0 ? `<div style="font-size: 0.85em; color: #fff; background: #f59e0b; padding: 4px 12px; border-radius: 20px; font-weight: 600; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);">Advance Applied: ₹${advanceApplied.toLocaleString('en-IN')}</div>` : ''}
+                    </div>
                 </div>
                 <div class="metric-card outline">
                     <p>Pending</p>
@@ -173,9 +177,10 @@ const App = {
             </div>
             
             <div class="metrics-grid">
-                <div class="card mb-0">
+                <div class="card mb-0" style="text-align: center; display: flex; flex-direction: column; align-items: center;">
                     <p class="text-muted">Paid Parents</p>
-                    <h3 style="color: var(--success); font-size: 1.5rem; margin-top: 4px;">${paid.length}</h3>
+                    <h3 style="color: var(--success); font-size: 1.5rem; margin-top: 4px; margin-bottom: 0;">${paid.length}</h3>
+                    ${upiCount > 0 ? `<div style="margin-top: 8px;"><span style="font-size: 0.8em; color: #fff; background: #8b5cf6; padding: 2px 10px; border-radius: 12px; font-weight: 600; box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);">UPI: ${upiCount}</span></div>` : ''}
                 </div>
                 <div class="card mb-0">
                     <p class="text-muted">Pending Parents</p>
@@ -309,11 +314,15 @@ const App = {
         const payments = await db.payments.where('month').equals(currentMonth).toArray();
         const parents = await db.parents.toArray();
 
+        let paidCount = 0;
         let list = parents.map((parent, index) => {
             const pay = payments.find(p => p.parentId === parent.id);
-            const status = pay && pay.status === 'Paid' ? '✅' : '❌';
+            const isPaid = pay && pay.status === 'Paid';
+            if (isPaid) paidCount++;
+            const status = isPaid ? '✅' : '❌';
+            const name = isPaid ? `*${parent.parentName}*` : parent.parentName;
             const serialNo = parent.serialNo !== undefined ? parent.serialNo : (index + 1);
-            return { serialNo, name: parent.parentName, status };
+            return { serialNo, name: name, status };
         });
 
         list.sort((a, b) => a.serialNo - b.serialNo);
@@ -323,6 +332,8 @@ const App = {
         list.forEach(item => {
             text += `${item.serialNo}. ${item.status} ${item.name}\n`;
         });
+
+        text += `\n\nTotal Paid: ${paidCount}/${parents.length}\n`;
 
         const outputDiv = document.getElementById('statusTextOutput');
         const textarea = document.getElementById('generatedStatusText');
