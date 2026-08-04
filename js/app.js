@@ -1460,10 +1460,10 @@ const App = {
             </div>
             
             <div class="flex gap-4" style="flex-direction: column;">
+                ${generateReceipt ? `
                 <button class="btn btn-primary" style="background: #25D366; border: none;" onclick="App.openWhatsApp('${paymentId}')">
                     <i data-lucide="message-circle"></i> Open WhatsApp
                 </button>
-                ${generateReceipt ? `
                 <button class="btn btn-secondary" onclick="App.generateJPG('${paymentId}')">
                     <i data-lucide="download"></i> Download JPG
                 </button>
