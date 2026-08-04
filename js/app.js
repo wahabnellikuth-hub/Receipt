@@ -91,6 +91,21 @@ const App = {
         UI.showToast(value ? 'Members Terminology Enabled' : 'Members Terminology Disabled');
     },
 
+    toggleAppPrefsLock() {
+        if (window.isAppPrefsUnlocked) {
+            window.isAppPrefsUnlocked = false;
+            this.renderPage('settings');
+        } else {
+            const code = prompt("Enter PIN code to unlock App Preferences:");
+            if (code === "1234") {
+                window.isAppPrefsUnlocked = true;
+                this.renderPage('settings');
+            } else if (code !== null) {
+                UI.showToast("Incorrect PIN code", "error");
+            }
+        }
+    },
+
     // --- DASHBOARD ---
     async renderDashboard(container) {
         const currentMonth = getActiveMonth();
@@ -1809,8 +1824,11 @@ const App = {
         try { const stored = await db.settings.get('useMembersTerminology'); if (stored) useMembersTerminology = true; } catch(e) {}
 
         container.innerHTML = `
-            <div style="margin-bottom: 20px; text-align: center;">
-                <h2 style="margin-bottom: 16px;">Settings</h2>
+            <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0;">Settings</h2>
+                <button class="btn btn-secondary" style="width: 40px; height: 40px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center;" onclick="App.toggleTheme()" title="Toggle Dark Mode">
+                    <span id="theme-toggle-container" style="display: flex; align-items: center; justify-content: center;"><i data-lucide="${lucideIcon}" id="theme-icon-settings"></i></span>
+                </button>
             </div>
             
             <div class="card mt-4">
@@ -1835,30 +1853,32 @@ const App = {
             </div>
 
             <div class="card mt-4">
-                <h3>App Preferences</h3>
-                <div class="flex justify-between align-center mt-2" style="margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
-                    <span style="font-weight: 500;">Enable Classes</span>
-                    <label class="switch" style="position: relative; display: inline-block; width: 44px; height: 24px;">
-                        <input type="checkbox" ${enableClasses ? 'checked' : ''} onchange="App.toggleEnableClasses(this.checked)" style="opacity: 0; width: 0; height: 0;">
-                        <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: ${enableClasses ? 'var(--primary-600)' : '#ccc'}; transition: .4s; border-radius: 24px;">
-                            <span style="position: absolute; content: ''; height: 18px; width: 18px; left: ${enableClasses ? '23px' : '3px'}; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%;"></span>
-                        </span>
-                    </label>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h3 style="margin: 0;">App Preferences</h3>
+                    <div style="padding: 6px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.05);" onclick="App.toggleAppPrefsLock()">
+                        <i data-lucide="${window.isAppPrefsUnlocked ? 'unlock' : 'lock'}" style="width: 16px; height: 16px; margin: 0;"></i>
+                    </div>
                 </div>
-                <div class="flex justify-between align-center mt-2" style="margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
-                    <span style="font-weight: 500;">Use 'Members' Terminology</span>
-                    <label class="switch" style="position: relative; display: inline-block; width: 44px; height: 24px;">
-                        <input type="checkbox" ${useMembersTerminology ? 'checked' : ''} onchange="App.toggleMembersTerminology(this.checked)" style="opacity: 0; width: 0; height: 0;">
-                        <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: ${useMembersTerminology ? 'var(--primary-600)' : '#ccc'}; transition: .4s; border-radius: 24px;">
-                            <span style="position: absolute; content: ''; height: 18px; width: 18px; left: ${useMembersTerminology ? '23px' : '3px'}; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%;"></span>
-                        </span>
-                    </label>
-                </div>
-                <div class="flex justify-between align-center mt-2">
-                    <span style="font-weight: 500;">Dark Mode</span>
-                    <button class="btn btn-secondary" style="width: auto; padding: 8px 16px;" onclick="App.toggleTheme()">
-                        <span id="theme-toggle-container" style="display: flex; align-items: center; justify-content: center;"><i data-lucide="${lucideIcon}" id="theme-icon-settings"></i></span> Toggle
-                    </button>
+                
+                <div style="opacity: ${window.isAppPrefsUnlocked ? '1' : '0.5'}; pointer-events: ${window.isAppPrefsUnlocked ? 'auto' : 'none'};">
+                    <div class="flex justify-between align-center mt-2" style="margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                        <span style="font-weight: 500;">Enable Classes</span>
+                        <label class="switch" style="position: relative; display: inline-block; width: 44px; height: 24px;">
+                            <input type="checkbox" ${enableClasses ? 'checked' : ''} onchange="App.toggleEnableClasses(this.checked)" style="opacity: 0; width: 0; height: 0;">
+                            <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: ${enableClasses ? 'var(--primary-600)' : '#ccc'}; transition: .4s; border-radius: 24px;">
+                                <span style="position: absolute; content: ''; height: 18px; width: 18px; left: ${enableClasses ? '23px' : '3px'}; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%;"></span>
+                            </span>
+                        </label>
+                    </div>
+                    <div class="flex justify-between align-center mt-2">
+                        <span style="font-weight: 500;">Use 'Members' Terminology</span>
+                        <label class="switch" style="position: relative; display: inline-block; width: 44px; height: 24px;">
+                            <input type="checkbox" ${useMembersTerminology ? 'checked' : ''} onchange="App.toggleMembersTerminology(this.checked)" style="opacity: 0; width: 0; height: 0;">
+                            <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: ${useMembersTerminology ? 'var(--primary-600)' : '#ccc'}; transition: .4s; border-radius: 24px;">
+                                <span style="position: absolute; content: ''; height: 18px; width: 18px; left: ${useMembersTerminology ? '23px' : '3px'}; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%;"></span>
+                            </span>
+                        </label>
+                    </div>
                 </div>
             </div>
 
