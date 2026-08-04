@@ -1620,7 +1620,13 @@ const App = {
             return;
         }
 
-        let defaultTemplate = "Assalamu Alaikum.\n\nThis is a gentle reminder that the Madrassa monthly fee for *{month}* is still pending.\n\nParent: {parent}\nClass: {class}\nMonthly Fee: ₹{fee}\n\nKindly make the payment at your earliest convenience.\n\nJazakumullahu Khair.";
+        let defaultTemplate = `السلام عليكم ورحمة الله وبركاته 
+
+സ്നേഹത്തോടെയുള്ള ഒരു ഓർമ്മപ്പെടുത്തൽ…
+
+{month} മാസത്തെ ഫീസ് ഇതുവരെ അടച്ചിട്ടില്ലെന്ന് ശ്രദ്ധയിൽ പെട്ടിട്ടുണ്ട്. ദയവായി സൗകര്യപ്രദമായ സമയത്ത് ഫീസ് അടക്കണമെന്ന് വിനയപൂർവ്വം ഓർമ്മിപ്പിക്കുന്നു.
+
+…جزاك الله خيرا`;
         let savedTemplate = defaultTemplate;
         try {
             const stored = await db.settings.get('reminderTemplate');
@@ -1931,7 +1937,13 @@ const App = {
         let generateReceipt = true;
         try { const stored = await db.settings.get('generateReceipt'); if (stored !== undefined && stored !== null) generateReceipt = stored; } catch(e) {}
 
-        let defaultTemplate = "Assalamu Alaikum.\n\nThis is a gentle reminder that the Madrassa monthly fee for *{month}* is still pending.\n\nParent: {parent}\nClass: {class}\nMonthly Fee: ₹{fee}\n\nKindly make the payment at your earliest convenience.\n\nJazakumullahu Khair.";
+        let defaultTemplate = `السلام عليكم ورحمة الله وبركاته 
+
+സ്നേഹത്തോടെയുള്ള ഒരു ഓർമ്മപ്പെടുത്തൽ…
+
+{month} മാസത്തെ ഫീസ് ഇതുവരെ അടച്ചിട്ടില്ലെന്ന് ശ്രദ്ധയിൽ പെട്ടിട്ടുണ്ട്. ദയവായി സൗകര്യപ്രദമായ സമയത്ത് ഫീസ് അടക്കണമെന്ന് വിനയപൂർവ്വം ഓർമ്മിപ്പിക്കുന്നു.
+
+…جزاك الله خيرا`;
         let reminderTemplate = defaultTemplate;
         try {
             const stored = await db.settings.get('reminderTemplate');
