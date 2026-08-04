@@ -2066,6 +2066,7 @@ const App = {
         const content = `
             <div style="margin-bottom: 20px;">
                 <p class="text-muted" style="margin-bottom: 12px; font-size: 0.9em;">Step 1: Download the blank template and fill it out.</p>
+                <p class="text-muted" style="margin-bottom: 12px; font-size: 0.85em; color: var(--primary-600);">Note: Only "Parent Name" is mandatory. Other missing details (like Fee or Class) can be added later using the Edit option.</p>
                 <button class="btn btn-secondary" style="width: 100%;" onclick="App.downloadImportTemplate()">
                     <i data-lucide="download"></i> Download Template
                 </button>
@@ -2129,7 +2130,7 @@ const App = {
                 const currentMonth = getActiveMonth();
                 
                 for (let row of rows) {
-                    if (!row['Parent Name'] || !row['Monthly Fee']) continue;
+                    if (!row['Parent Name']) continue;
                     
                     let classId = classes[0] ? classes[0].id : '';
                     if (row['Class']) {
@@ -2147,7 +2148,7 @@ const App = {
                         studentName: row['Student Name'] ? String(row['Student Name']) : '',
                         classId: classId,
                         whatsappNumber: row['WhatsApp Number'] ? String(row['WhatsApp Number']).replace(/\\D/g,'') : '',
-                        monthlyFee: Number(row['Monthly Fee']),
+                        monthlyFee: row['Monthly Fee'] ? Number(row['Monthly Fee']) : 0,
                         notes: ''
                     });
                     
