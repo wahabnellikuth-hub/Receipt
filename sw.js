@@ -1,4 +1,4 @@
-const CACHE_NAME = 'madrassa-app-v54';
+const CACHE_NAME = 'madrassa-app-v55';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
