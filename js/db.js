@@ -14,16 +14,27 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
-// Multi-tenancy: Get Madrasa ID from URL or localStorage
+// Multi-tenancy: Get Madrasa ID from URL or PWA storage
 function getActiveMadrasa() {
     const urlParams = new URLSearchParams(window.location.search);
     const mFromUrl = urlParams.get('m');
+    
     if (mFromUrl) {
+        // Always save to localStorage in case they install it as a PWA
         localStorage.setItem('activeMadrasa', mFromUrl);
         return mFromUrl;
     }
-    const stored = localStorage.getItem('activeMadrasa');
-    if (stored) return stored;
+    
+    // Check if the app is running as an installed PWA on a phone/desktop
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    
+    if (isPWA) {
+        // Installed PWAs don't have URL parameters, so read from storage
+        const stored = localStorage.getItem('activeMadrasa');
+        if (stored) return stored;
+    }
+    
+    // If it's a normal browser visit and there's no ?m= in the link, ALWAYS show original data
     return 'default';
 }
 
