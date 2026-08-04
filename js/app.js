@@ -197,6 +197,10 @@ const App = {
                             <span style="position: absolute; top: -8px; right: -8px; background: var(--danger); color: white; font-size: 0.75rem; font-weight: bold; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 2px solid var(--surface-color); box-shadow: 0 2px 5px rgba(0,0,0,0.2);">${unsentMessages.length}</span>
                         </button>
                     ` : ''}
+                    <button class="btn" style="padding: 10px 16px; font-size: 0.9rem; background: #eab308; color: white; border-radius: 12px; border: none; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: transform 0.2s;" onclick="App.sendBulkReminders()" onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform='scale(1)'" onmouseleave="this.style.transform='scale(1)'">
+                        <i data-lucide="bell" style="width: 18px; height: 18px;"></i> 
+                        Send Reminders
+                    </button>
                     <button class="btn" style="padding: 10px 16px; font-size: 0.9rem; background: var(--primary-600); color: white; border-radius: 12px; border: none; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: transform 0.2s;" onclick="App.openPosterGeneratorModal()" onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform='scale(1)'" onmouseleave="this.style.transform='scale(1)'">
                         <i data-lucide="bar-chart-2" style="width: 18px; height: 18px;"></i> 
                         Status Poster
@@ -1437,34 +1441,51 @@ const App = {
     // --- WHATSAPP & PDF ---
     async sendBulkReminders() {
         const currentMonth = getActiveMonth();
-        const payments = await db.payments.where({month: currentMonth, status: 'Pending'}).toArray();
+        const paymentsMonth = await db.payments.where('month').equals(currentMonth).toArray();
+        const payments = paymentsMonth.filter(p => p.status === 'Pending');
+        
         if(payments.length === 0) {
             UI.showToast('No pending payments for this month!', 'info');
             return;
         }
         
         const content = `
-            <p>There are <strong>${payments.length}</strong> pending payments for ${currentMonth}.</p>
-            <p class="text-muted" style="font-size: 0.9em; margin-bottom: 20px;">Currently, WhatsApp requires sending messages one by one. Click below to start messaging the first pending parent.</p>
-            <div id="reminderQueue"></div>
+            <p>There are <strong>${payments.length}</strong> pending payments for ${formatMonthYear(currentMonth)}.</p>
+            <p class="text-muted" style="font-size: 0.9em; margin-bottom: 20px;">Currently, WhatsApp requires sending messages one by one. Click below to start messaging the pending parents.</p>
+            <div id="reminderQueue" style="max-height: 400px; overflow-y: auto;"></div>
         `;
         
         UI.openModal('Send Reminders', content, async (modal) => {
             const queueContainer = modal.querySelector('#reminderQueue');
-            // Show the first 5 to avoid overwhelming
             let html = '';
-            for(let i=0; i < Math.min(payments.length, 5); i++) {
-                const parent = await db.parents.get(payments[i].parentId);
-                const cls = await db.classes.get(parent.classId);
-                const msg = encodeURIComponent(`Assalamu Alaikum.\n\nThis is a gentle reminder that the Madrassa monthly fee for *${currentMonth}* is still pending.\n\nParent: ${parent.parentName}\nClass: ${cls.name}\nMonthly Fee: ₹${parent.monthlyFee}\n\nKindly make the payment at your earliest convenience.\n\nJazakumullahu Khair.`);
+            
+            let listData = [];
+            for(let p of payments) {
+                const parent = await db.parents.get(p.parentId);
+                if (parent) {
+                    const cls = await db.classes.get(parent.classId);
+                    listData.push({ payment: p, parent, cls });
+                }
+            }
+            
+            listData.sort((a, b) => (a.parent.serialNo || 0) - (b.parent.serialNo || 0));
+            
+            for(let item of listData) {
+                const { parent, cls } = item;
+                const msg = encodeURIComponent(`Assalamu Alaikum.\n\nThis is a gentle reminder that the Madrassa monthly fee for *${formatMonthYear(currentMonth)}* is still pending.\n\nParent: ${parent.parentName}\nClass: ${cls ? cls.name : 'Unknown'}\nMonthly Fee: ₹${parent.monthlyFee}\n\nKindly make the payment at your earliest convenience.\n\nJazakumullahu Khair.`);
                 
                 html += `
-                    <a href="https://wa.me/${parent.whatsappNumber}?text=${msg}" target="_blank" class="btn btn-secondary mb-4" style="display: flex; text-decoration: none;" onclick="this.style.opacity='0.5';">
-                        <i data-lucide="send"></i> Send to ${parent.parentName}
-                    </a>
+                    <div class="list-item" style="padding: 12px; margin-bottom: 8px;">
+                        <div class="list-item-content">
+                            <h4 style="margin: 0; font-size: 1rem;">${parent.serialNo || ''}. ${parent.parentName}</h4>
+                            <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">${cls ? cls.name : 'Unknown'} • ₹${parent.monthlyFee}</p>
+                        </div>
+                        <a href="https://wa.me/${parent.whatsappNumber}?text=${msg}" target="_blank" class="btn" style="width: auto; padding: 8px 16px; background: #25D366; color: white; border-radius: 8px; border: none; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;" onclick="this.style.opacity='0.5';">
+                            <i data-lucide="send" style="width: 16px; height: 16px;"></i> Send
+                        </a>
+                    </div>
                 `;
             }
-            if(payments.length > 5) html += `<p class="text-center text-muted">...and ${payments.length - 5} more.</p>`;
             queueContainer.innerHTML = html;
             lucide.createIcons({root: queueContainer});
         });
