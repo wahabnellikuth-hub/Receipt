@@ -1,7 +1,23 @@
 const App = {
+    t(str) {
+        if (!window.useMembersTerminology) return str;
+        return str
+            .replace(/Parent/g, 'Member')
+            .replace(/parent/g, 'member')
+            .replace(/Parents/g, 'Members')
+            .replace(/parents/g, 'members');
+    },
     async init() {
         // Run monthly task
         await db.open();
+        
+        let membersTerm = false;
+        try { const stored = await db.settings.get('useMembersTerminology'); if(stored) membersTerm = true; } catch(e) {}
+        window.useMembersTerminology = membersTerm;
+        
+        const navParentsText = document.getElementById('nav-parents-text');
+        if (navParentsText) navParentsText.textContent = this.t('Parents');
+        
         await generateMonthlyRecords();
         
         UI.initNavigation();
@@ -64,6 +80,15 @@ const App = {
         window.currentPaymentClassFilter = null;
         this.renderPage('settings');
         UI.showToast(value ? 'Classes Enabled' : 'Classes Disabled');
+    },
+    
+    async toggleMembersTerminology(value) {
+        await db.settings.set('useMembersTerminology', value);
+        window.useMembersTerminology = value;
+        const navParentsText = document.getElementById('nav-parents-text');
+        if (navParentsText) navParentsText.textContent = this.t('Parents');
+        this.renderPage('settings');
+        UI.showToast(value ? 'Members Terminology Enabled' : 'Members Terminology Disabled');
     },
 
     // --- DASHBOARD ---
@@ -186,12 +211,12 @@ const App = {
             
             <div class="metrics-grid">
                 <div class="card mb-0" style="text-align: center; display: flex; flex-direction: column; align-items: center;">
-                    <p class="text-muted">Paid Parents</p>
+                    <p class="text-muted">\${App.t("Paid Parents")}</p>
                     <h3 style="color: var(--success); font-size: 1.5rem; margin-top: 4px; margin-bottom: 0;">${paid.length}</h3>
                     ${upiCount > 0 ? `<div style="margin-top: 8px;"><span style="font-size: 0.8em; color: #fff; background: #8b5cf6; padding: 2px 10px; border-radius: 12px; font-weight: 600; box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);">UPI: ${upiCount}</span></div>` : ''}
                 </div>
                 <div class="card mb-0">
-                    <p class="text-muted">Pending Parents</p>
+                    <p class="text-muted">\${App.t("Pending Parents")}</p>
                     <h3 style="color: var(--danger); font-size: 1.5rem; margin-top: 4px;">${pending.length}</h3>
                 </div>
             </div>
@@ -389,7 +414,7 @@ const App = {
         }
         
         const content = `
-            <p class="text-muted" style="font-size: 0.9em; margin-bottom: 16px;">Click the WhatsApp icon to message the parent.</p>
+            <p class="text-muted" style="font-size: 0.9em; margin-bottom: 16px;">\${App.t("Click the WhatsApp icon to message the parent.")}</p>
             <div id="unsentReceiptsList">
                 ${unsentList.map(item => `
                     <div class="list-item" style="padding: 12px; margin-bottom: 8px;">
@@ -669,9 +694,9 @@ const App = {
 
         let html = `
             <div style="margin-bottom: 20px; text-align: center;">
-                <h2 style="margin-bottom: 16px;">Parents Directory</h2>
+                <h2 style="margin-bottom: 16px;">\${App.t("Parents Directory")}</h2>
                 <button class="btn btn-primary" onclick="App.openAddParentModal()">
-                    <i data-lucide="user-plus"></i> Add Parent
+                    <i data-lucide="user-plus"></i> \${App.t("Add Parent")}
                 </button>
             </div>
             
@@ -686,7 +711,7 @@ const App = {
         `;
         
         if (parents.length === 0) {
-            html += `<p class="text-center text-muted">No parents added yet.</p>`;
+            html += `<p class="text-center text-muted">\${App.t("No parents added yet.")}</p>`;
         } else {
             // Filter by class if active
             const filteredParents = window.currentClassFilter 
@@ -694,7 +719,7 @@ const App = {
                 : parents;
 
             if (filteredParents.length === 0) {
-                html += `<p class="text-center text-muted">No parents found in this class.</p>`;
+                html += `<p class="text-center text-muted">\${App.t("No parents found in this class.")}</p>`;
             } else {
                 // Sort by serial number or fallback to original index
                 filteredParents.sort((a, b) => {
@@ -785,7 +810,7 @@ const App = {
                     <input type="number" name="serialNo" class="form-control" value="${nextSerial}" required>
                 </div>
                 <div class="form-group">
-                    <label>Parent Name *</label>
+                    <label>\${App.t("Parent Name *")}</label>
                     <input type="text" name="parentName" class="form-control" required>
                 </div>
                 <div class="form-group">
@@ -801,11 +826,11 @@ const App = {
                     <label>Monthly Fee (₹) *</label>
                     <input type="number" name="monthlyFee" class="form-control" inputmode="numeric" required>
                 </div>
-                <button type="submit" class="btn btn-primary mt-4">Save Parent</button>
+                <button type="submit" class="btn btn-primary mt-4">\${App.t("Save Parent")}</button>
             </form>
         `;
         
-        UI.openModal('Add Parent', content, (modal, closeFunc) => {
+        UI.openModal('\${App.t("Add Parent")}', content, (modal, closeFunc) => {
             modal.querySelector('#addParentForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const fd = new FormData(e.target);
@@ -830,7 +855,7 @@ const App = {
                         remarks: '',
                         receiptNo: null
                     });
-                    UI.showToast('Parent added successfully');
+                    UI.showToast(App.t('Parent added successfully'));
                     closeFunc();
                     App.renderPage('classes');
                 } catch(err) {
@@ -868,7 +893,7 @@ const App = {
                     <input type="number" name="serialNo" class="form-control" value="${currentSerial}" required>
                 </div>
                 <div class="form-group">
-                    <label>Parent Name *</label>
+                    <label>\${App.t("Parent Name *")}</label>
                     <input type="text" name="parentName" class="form-control" value="${parent.parentName}" required>
                 </div>
                 <div class="form-group">
@@ -884,11 +909,11 @@ const App = {
                     <label>Monthly Fee (₹) *</label>
                     <input type="number" name="monthlyFee" class="form-control" value="${parent.monthlyFee}" inputmode="numeric" required>
                 </div>
-                <button type="submit" class="btn btn-primary mt-4">Update Parent</button>
+                <button type="submit" class="btn btn-primary mt-4">\${App.t("Update Parent")}</button>
             </form>
         `;
         
-        UI.openModal('Edit Parent', content, (modal, closeFunc) => {
+        UI.openModal(App.t('Edit Parent'), content, (modal, closeFunc) => {
             modal.querySelector('#editParentForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const fd = new FormData(e.target);
@@ -901,7 +926,7 @@ const App = {
                         whatsappNumber: fd.get('whatsappNumber'),
                         monthlyFee: Number(fd.get('monthlyFee'))
                     });
-                    UI.showToast('Parent updated successfully');
+                    UI.showToast(App.t('Parent updated successfully'));
                     closeFunc();
                     App.renderPage('classes');
                 } catch(err) {
@@ -912,7 +937,7 @@ const App = {
     },
 
     async deleteParent(id) {
-        if(confirm('Are you sure you want to delete this parent? This will also remove their entire payment history.')) {
+        if(confirm(App.t('Are you sure you want to delete this parent? This will also remove their entire payment history.'))) {
             try {
                 await db.parents.delete(id);
                 // Also delete their payments to keep db clean
@@ -920,10 +945,10 @@ const App = {
                 const paymentIds = payments.map(p => p.id);
                 await db.payments.bulkDelete(paymentIds);
                 
-                UI.showToast('Parent deleted successfully');
+                UI.showToast(App.t('Parent deleted successfully'));
                 App.renderPage('classes');
             } catch(err) {
-                UI.showToast('Error deleting parent', 'error');
+                UI.showToast(App.t('Error deleting parent'), 'error');
             }
         }
     },
@@ -1779,6 +1804,9 @@ const App = {
         
         let enableClasses = true;
         try { const stored = await db.settings.get('enableClasses'); if (stored !== undefined && stored !== null) enableClasses = stored; } catch(e) {}
+        
+        let useMembersTerminology = false;
+        try { const stored = await db.settings.get('useMembersTerminology'); if (stored) useMembersTerminology = true; } catch(e) {}
 
         container.innerHTML = `
             <div style="margin-bottom: 20px; text-align: center;">
@@ -1817,6 +1845,15 @@ const App = {
                         </span>
                     </label>
                 </div>
+                <div class="flex justify-between align-center mt-2" style="margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                    <span style="font-weight: 500;">Use 'Members' Terminology</span>
+                    <label class="switch" style="position: relative; display: inline-block; width: 44px; height: 24px;">
+                        <input type="checkbox" ${useMembersTerminology ? 'checked' : ''} onchange="App.toggleMembersTerminology(this.checked)" style="opacity: 0; width: 0; height: 0;">
+                        <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: ${useMembersTerminology ? 'var(--primary-600)' : '#ccc'}; transition: .4s; border-radius: 24px;">
+                            <span style="position: absolute; content: ''; height: 18px; width: 18px; left: ${useMembersTerminology ? '23px' : '3px'}; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%;"></span>
+                        </span>
+                    </label>
+                </div>
                 <div class="flex justify-between align-center mt-2">
                     <span style="font-weight: 500;">Dark Mode</span>
                     <button class="btn btn-secondary" style="width: auto; padding: 8px 16px;" onclick="App.toggleTheme()">
@@ -1831,10 +1868,10 @@ const App = {
                 
                 <div class="flex gap-4" style="flex-direction: column;">
                     <button class="btn btn-secondary" style="border-color: var(--primary-600); color: var(--primary-600);" onclick="App.openImportParentsModal()">
-                        <i data-lucide="upload"></i> Import Parents (Excel)
+                        <i data-lucide="upload"></i> \${App.t("Import Parents (Excel)")}
                     </button>
                     <button class="btn btn-secondary" onclick="App.exportParents()">
-                        <i data-lucide="users"></i> Export All Parents (Excel)
+                        <i data-lucide="users"></i> \${App.t("Export All Parents (Excel)")}
                     </button>
                     <button class="btn btn-secondary" onclick="App.openExportPaymentsModal()">
                         <i data-lucide="table"></i> Export This Month Payments (Excel)
@@ -1847,7 +1884,7 @@ const App = {
             
             <div class="card mt-4" style="border: 1px solid var(--danger); background: rgba(239, 68, 68, 0.05);">
                 <h3 style="color: var(--danger);">Danger Zone</h3>
-                <p class="text-muted mb-4">Permanently delete all parents and payment records. This cannot be undone.</p>
+                <p class="text-muted mb-4">\${App.t("Permanently delete all parents and payment records.")} This cannot be undone.</p>
                 <button class="btn" id="dangerZoneBtn" style="background: var(--danger); color: white; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3); opacity: ${window.isDangerUnlocked ? '1' : '0.7'}; display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 10px 16px;" onclick="if(window.isDangerUnlocked) { App.clearDatabase(); } else { UI.showToast('Please tap the lock icon to unlock this action.', 'info'); }">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <i data-lucide="trash-2"></i> Clear Database Completely
@@ -1940,7 +1977,7 @@ const App = {
             };
         });
         
-        this.downloadExcel(data, 'Parents_List.xlsx');
+        this.downloadExcel(data, App.t('Parents_List.xlsx'));
     },
     openExportPaymentsModal() {
         const content = `
@@ -2021,7 +2058,7 @@ const App = {
                 </button>
             </div>
         `;
-        UI.openModal('Import Parents', content);
+        UI.openModal(App.t('Import Parents'), content);
     },
 
     async downloadImportTemplate() {
