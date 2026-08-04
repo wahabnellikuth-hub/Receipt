@@ -57,6 +57,14 @@ const App = {
             lucide.createIcons({ root: settingsIconContainer });
         }
     },
+    
+    async toggleEnableClasses(value) {
+        await db.settings.set('enableClasses', value);
+        window.currentClassFilter = null;
+        window.currentPaymentClassFilter = null;
+        this.renderPage('settings');
+        UI.showToast(value ? 'Classes Enabled' : 'Classes Disabled');
+    },
 
     // --- DASHBOARD ---
     async renderDashboard(container) {
@@ -634,24 +642,30 @@ const App = {
         const classes = await db.classes.toArray();
         const parents = await db.parents.toArray();
         
-        let iconsHtml = `<div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px;">`;
-        classes.forEach((cls, i) => {
-            const num = i + 1; // 1 to 10
-            const isActive = window.currentClassFilter === cls.id;
-            iconsHtml += `
-                <div onclick="App.filterByClass('${cls.id}')" style="
-                    display: flex; flex-direction: column; align-items: center; justify-content: center;
-                    aspect-ratio: 1; border-radius: 16px; cursor: pointer; transition: all 0.2s;
-                    background: ${isActive ? 'var(--primary-600)' : 'var(--bg-color)'};
-                    color: ${isActive ? 'white' : 'var(--text-color)'};
-                    border: 1px solid ${isActive ? 'var(--primary-600)' : 'var(--border-color)'};
-                    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-                ">
-                    <span style="font-size: 1.5rem; font-weight: 700;">${num}</span>
-                </div>
-            `;
-        });
-        iconsHtml += `</div>`;
+        let enableClasses = true;
+        try { const stored = await db.settings.get('enableClasses'); if (stored !== undefined && stored !== null) enableClasses = stored; } catch(e) {}
+        
+        let iconsHtml = '';
+        if (enableClasses) {
+            iconsHtml = `<div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px;">`;
+            classes.forEach((cls, i) => {
+                const num = i + 1; // 1 to 10
+                const isActive = window.currentClassFilter === cls.id;
+                iconsHtml += `
+                    <div onclick="App.filterByClass('${cls.id}')" style="
+                        display: flex; flex-direction: column; align-items: center; justify-content: center;
+                        aspect-ratio: 1; border-radius: 16px; cursor: pointer; transition: all 0.2s;
+                        background: ${isActive ? 'var(--primary-600)' : 'var(--bg-color)'};
+                        color: ${isActive ? 'white' : 'var(--text-color)'};
+                        border: 1px solid ${isActive ? 'var(--primary-600)' : 'var(--border-color)'};
+                        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+                    ">
+                        <span style="font-size: 1.5rem; font-weight: 700;">${num}</span>
+                    </div>
+                `;
+            });
+            iconsHtml += `</div>`;
+        }
 
         let html = `
             <div style="margin-bottom: 20px; text-align: center;">
@@ -752,6 +766,18 @@ const App = {
             return `<option value="${c.id}" ${isSelected}>${c.name}</option>`;
         }).join('');
         
+        let enableClasses = true;
+        try { const stored = await db.settings.get('enableClasses'); if (stored !== undefined && stored !== null) enableClasses = stored; } catch(e) {}
+        
+        let classFieldHtml = enableClasses ? `
+                <div class="form-group">
+                    <label>Class</label>
+                    <select name="classId" class="form-control" required>
+                        ${classOpts}
+                    </select>
+                </div>
+        ` : `<input type="hidden" name="classId" value="${classes[0] ? classes[0].id : ''}">`;
+        
         const content = `
             <form id="addParentForm">
                 <div class="form-group">
@@ -766,12 +792,7 @@ const App = {
                     <label>Student Name (Optional)</label>
                     <input type="text" name="studentName" class="form-control">
                 </div>
-                <div class="form-group">
-                    <label>Class</label>
-                    <select name="classId" class="form-control" required>
-                        ${classOpts}
-                    </select>
-                </div>
+                ${classFieldHtml}
                 <div class="form-group">
                     <label>WhatsApp Number (with country code, e.g. 91XXXXXXXXXX)</label>
                     <input type="tel" name="whatsappNumber" class="form-control" inputmode="tel">
@@ -828,6 +849,18 @@ const App = {
         
         let classOpts = classes.map(c => `<option value="${c.id}" ${c.id === parent.classId ? 'selected' : ''}>${c.name}</option>`).join('');
         
+        let enableClasses = true;
+        try { const stored = await db.settings.get('enableClasses'); if (stored !== undefined && stored !== null) enableClasses = stored; } catch(e) {}
+        
+        let classFieldHtml = enableClasses ? `
+                <div class="form-group">
+                    <label>Class</label>
+                    <select name="classId" class="form-control" required>
+                        ${classOpts}
+                    </select>
+                </div>
+        ` : `<input type="hidden" name="classId" value="${parent.classId}">`;
+        
         const content = `
             <form id="editParentForm">
                 <div class="form-group">
@@ -842,12 +875,7 @@ const App = {
                     <label>Student Name (Optional)</label>
                     <input type="text" name="studentName" class="form-control" value="${parent.studentName || ''}">
                 </div>
-                <div class="form-group">
-                    <label>Class</label>
-                    <select name="classId" class="form-control" required>
-                        ${classOpts}
-                    </select>
-                </div>
+                ${classFieldHtml}
                 <div class="form-group">
                     <label>WhatsApp Number</label>
                     <input type="tel" name="whatsappNumber" class="form-control" value="${parent.whatsappNumber}" inputmode="tel">
@@ -923,25 +951,31 @@ const App = {
         
         // State for filters
         window.currentPaymentFilter = window.currentPaymentFilter || 'Pending';
+        
+        let enableClasses = true;
+        try { const stored = await db.settings.get('enableClasses'); if (stored !== undefined && stored !== null) enableClasses = stored; } catch(e) {}
 
-        let iconsHtml = `<div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px;">`;
-        classes.forEach((cls, i) => {
-            const num = i + 1; // 1 to 10
-            const isActive = window.currentPaymentClassFilter === cls.id;
-            iconsHtml += `
-                <div onclick="App.filterPaymentByClass('${cls.id}')" style="
-                    display: flex; flex-direction: column; align-items: center; justify-content: center;
-                    aspect-ratio: 1; border-radius: 16px; cursor: pointer; transition: all 0.2s;
-                    background: ${isActive ? 'var(--primary-600)' : 'var(--bg-color)'};
-                    color: ${isActive ? 'white' : 'var(--text-color)'};
-                    border: 1px solid ${isActive ? 'var(--primary-600)' : 'var(--border-color)'};
-                    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-                ">
-                    <span style="font-size: 1.5rem; font-weight: 700;">${num}</span>
-                </div>
-            `;
-        });
-        iconsHtml += `</div>`;
+        let iconsHtml = '';
+        if (enableClasses) {
+            iconsHtml = `<div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px;">`;
+            classes.forEach((cls, i) => {
+                const num = i + 1; // 1 to 10
+                const isActive = window.currentPaymentClassFilter === cls.id;
+                iconsHtml += `
+                    <div onclick="App.filterPaymentByClass('${cls.id}')" style="
+                        display: flex; flex-direction: column; align-items: center; justify-content: center;
+                        aspect-ratio: 1; border-radius: 16px; cursor: pointer; transition: all 0.2s;
+                        background: ${isActive ? 'var(--primary-600)' : 'var(--bg-color)'};
+                        color: ${isActive ? 'white' : 'var(--text-color)'};
+                        border: 1px solid ${isActive ? 'var(--primary-600)' : 'var(--border-color)'};
+                        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+                    ">
+                        <span style="font-size: 1.5rem; font-weight: 700;">${num}</span>
+                    </div>
+                `;
+            });
+            iconsHtml += `</div>`;
+        }
         
         const renderList = (filter) => {
             window.currentPaymentFilter = filter;
@@ -1448,47 +1482,82 @@ const App = {
             UI.showToast('No pending payments for this month!', 'info');
             return;
         }
+
+        let defaultTemplate = "Assalamu Alaikum.\n\nThis is a gentle reminder that the Madrassa monthly fee for *{month}* is still pending.\n\nParent: {parent}\nClass: {class}\nMonthly Fee: ₹{fee}\n\nKindly make the payment at your earliest convenience.\n\nJazakumullahu Khair.";
+        let savedTemplate = defaultTemplate;
+        try {
+            const stored = await db.settings.get('reminderTemplate');
+            if (stored) savedTemplate = stored;
+        } catch(e) {}
+
+        // Save data globally to regenerate the list when template changes
+        window.currentPendingPayments = [];
+        for(let p of payments) {
+            const parent = await db.parents.get(p.parentId);
+            if (parent) {
+                const cls = await db.classes.get(parent.classId);
+                window.currentPendingPayments.push({ payment: p, parent, cls });
+            }
+        }
+        window.currentPendingPayments.sort((a, b) => (a.parent.serialNo || 0) - (b.parent.serialNo || 0));
         
         const content = `
-            <p>There are <strong>${payments.length}</strong> pending payments for ${formatMonthYear(currentMonth)}.</p>
-            <p class="text-muted" style="font-size: 0.9em; margin-bottom: 20px;">Currently, WhatsApp requires sending messages one by one. Click below to start messaging the pending parents.</p>
-            <div id="reminderQueue" style="max-height: 400px; overflow-y: auto;"></div>
+            <div style="background: var(--bg-color); padding: 16px; border-radius: 12px; margin-bottom: 16px; border: 1px solid var(--border-color);">
+                <label style="font-weight: 600; display: block; margin-bottom: 4px;">Message Template</label>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Use placeholders: <code>{month}</code>, <code>{parent}</code>, <code>{class}</code>, <code>{fee}</code></p>
+                <textarea id="reminderTemplateInput" class="form-control" rows="5" style="resize: vertical; font-size: 0.9em; margin-bottom: 12px;">${savedTemplate}</textarea>
+                <button class="btn btn-primary" style="width: 100%;" onclick="App.saveReminderTemplate()">Update & Save Template</button>
+            </div>
+            <p style="margin-bottom: 12px;">There are <strong>${payments.length}</strong> pending payments for ${formatMonthYear(currentMonth)}.</p>
+            <div id="reminderQueue" style="max-height: 350px; overflow-y: auto;"></div>
         `;
         
         UI.openModal('Send Reminders', content, async (modal) => {
-            const queueContainer = modal.querySelector('#reminderQueue');
-            let html = '';
-            
-            let listData = [];
-            for(let p of payments) {
-                const parent = await db.parents.get(p.parentId);
-                if (parent) {
-                    const cls = await db.classes.get(parent.classId);
-                    listData.push({ payment: p, parent, cls });
-                }
-            }
-            
-            listData.sort((a, b) => (a.parent.serialNo || 0) - (b.parent.serialNo || 0));
-            
-            for(let item of listData) {
-                const { parent, cls } = item;
-                const msg = encodeURIComponent(`Assalamu Alaikum.\n\nThis is a gentle reminder that the Madrassa monthly fee for *${formatMonthYear(currentMonth)}* is still pending.\n\nParent: ${parent.parentName}\nClass: ${cls ? cls.name : 'Unknown'}\nMonthly Fee: ₹${parent.monthlyFee}\n\nKindly make the payment at your earliest convenience.\n\nJazakumullahu Khair.`);
-                
-                html += `
-                    <div class="list-item" style="padding: 12px; margin-bottom: 8px;">
-                        <div class="list-item-content">
-                            <h4 style="margin: 0; font-size: 1rem;">${parent.serialNo || ''}. ${parent.parentName}</h4>
-                            <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">${cls ? cls.name : 'Unknown'} • ₹${parent.monthlyFee}</p>
-                        </div>
-                        <a href="https://wa.me/${parent.whatsappNumber}?text=${msg}" target="_blank" class="btn" style="width: auto; padding: 8px 16px; background: #25D366; color: white; border-radius: 8px; border: none; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;" onclick="this.style.opacity='0.5';">
-                            <i data-lucide="send" style="width: 16px; height: 16px;"></i> Send
-                        </a>
-                    </div>
-                `;
-            }
-            queueContainer.innerHTML = html;
-            lucide.createIcons({root: queueContainer});
+            App.renderReminderQueue(savedTemplate);
         });
+    },
+
+    async saveReminderTemplate() {
+        const template = document.getElementById('reminderTemplateInput').value;
+        await db.settings.set('reminderTemplate', template);
+        UI.showToast('Template saved successfully!');
+        App.renderReminderQueue(template);
+    },
+
+    renderReminderQueue(template) {
+        const queueContainer = document.getElementById('reminderQueue');
+        if(!queueContainer) return;
+        
+        const currentMonth = getActiveMonth();
+        const monthText = formatMonthYear(currentMonth);
+        let html = '';
+        
+        for(let item of window.currentPendingPayments) {
+            const { parent, cls } = item;
+            const className = cls ? cls.name : 'Unknown';
+            
+            let msg = template
+                .replace(/{month}/g, monthText)
+                .replace(/{parent}/g, parent.parentName)
+                .replace(/{class}/g, className)
+                .replace(/{fee}/g, parent.monthlyFee);
+                
+            const encodedMsg = encodeURIComponent(msg);
+            
+            html += `
+                <div class="list-item" style="padding: 12px; margin-bottom: 8px;">
+                    <div class="list-item-content">
+                        <h4 style="margin: 0; font-size: 1rem;">${parent.serialNo || ''}. ${parent.parentName}</h4>
+                        <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">${className} • ₹${parent.monthlyFee}</p>
+                    </div>
+                    <a href="https://wa.me/${parent.whatsappNumber}?text=${encodedMsg}" target="_blank" class="btn" style="width: auto; padding: 8px 16px; background: #25D366; color: white; border-radius: 8px; border: none; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;" onclick="this.style.opacity='0.5';">
+                        <i data-lucide="send" style="width: 16px; height: 16px;"></i> Send
+                    </a>
+                </div>
+            `;
+        }
+        queueContainer.innerHTML = html;
+        lucide.createIcons({root: queueContainer});
     },
 
     async generateJPG(paymentId) {
@@ -1707,6 +1776,9 @@ const App = {
         } catch(e) {}
         const instLine1 = globalSettings.instLine1 || 'MANSHAUL ULOOM';
         const instLine2 = globalSettings.instLine2 || 'MADRASA';
+        
+        let enableClasses = true;
+        try { const stored = await db.settings.get('enableClasses'); if (stored !== undefined && stored !== null) enableClasses = stored; } catch(e) {}
 
         container.innerHTML = `
             <div style="margin-bottom: 20px; text-align: center;">
@@ -1736,6 +1808,15 @@ const App = {
 
             <div class="card mt-4">
                 <h3>App Preferences</h3>
+                <div class="flex justify-between align-center mt-2" style="margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                    <span style="font-weight: 500;">Enable Classes</span>
+                    <label class="switch" style="position: relative; display: inline-block; width: 44px; height: 24px;">
+                        <input type="checkbox" ${enableClasses ? 'checked' : ''} onchange="App.toggleEnableClasses(this.checked)" style="opacity: 0; width: 0; height: 0;">
+                        <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: ${enableClasses ? 'var(--primary-600)' : '#ccc'}; transition: .4s; border-radius: 24px;">
+                            <span style="position: absolute; content: ''; height: 18px; width: 18px; left: ${enableClasses ? '23px' : '3px'}; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%;"></span>
+                        </span>
+                    </label>
+                </div>
                 <div class="flex justify-between align-center mt-2">
                     <span style="font-weight: 500;">Dark Mode</span>
                     <button class="btn btn-secondary" style="width: auto; padding: 8px 16px;" onclick="App.toggleTheme()">
