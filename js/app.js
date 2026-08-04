@@ -211,12 +211,12 @@ const App = {
             
             <div class="metrics-grid">
                 <div class="card mb-0" style="text-align: center; display: flex; flex-direction: column; align-items: center;">
-                    <p class="text-muted">\${App.t("Paid Parents")}</p>
+                    <p class="text-muted">${App.t("Paid Parents")}</p>
                     <h3 style="color: var(--success); font-size: 1.5rem; margin-top: 4px; margin-bottom: 0;">${paid.length}</h3>
                     ${upiCount > 0 ? `<div style="margin-top: 8px;"><span style="font-size: 0.8em; color: #fff; background: #8b5cf6; padding: 2px 10px; border-radius: 12px; font-weight: 600; box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);">UPI: ${upiCount}</span></div>` : ''}
                 </div>
                 <div class="card mb-0">
-                    <p class="text-muted">\${App.t("Pending Parents")}</p>
+                    <p class="text-muted">${App.t("Pending Parents")}</p>
                     <h3 style="color: var(--danger); font-size: 1.5rem; margin-top: 4px;">${pending.length}</h3>
                 </div>
             </div>
@@ -414,7 +414,7 @@ const App = {
         }
         
         const content = `
-            <p class="text-muted" style="font-size: 0.9em; margin-bottom: 16px;">\${App.t("Click the WhatsApp icon to message the parent.")}</p>
+            <p class="text-muted" style="font-size: 0.9em; margin-bottom: 16px;">${App.t("Click the WhatsApp icon to message the parent.")}</p>
             <div id="unsentReceiptsList">
                 ${unsentList.map(item => `
                     <div class="list-item" style="padding: 12px; margin-bottom: 8px;">
@@ -694,9 +694,9 @@ const App = {
 
         let html = `
             <div style="margin-bottom: 20px; text-align: center;">
-                <h2 style="margin-bottom: 16px;">\${App.t("Parents Directory")}</h2>
+                <h2 style="margin-bottom: 16px;">${App.t("Parents Directory")}</h2>
                 <button class="btn btn-primary" onclick="App.openAddParentModal()">
-                    <i data-lucide="user-plus"></i> \${App.t("Add Parent")}
+                    <i data-lucide="user-plus"></i> ${App.t("Add Parent")}
                 </button>
             </div>
             
@@ -711,7 +711,7 @@ const App = {
         `;
         
         if (parents.length === 0) {
-            html += `<p class="text-center text-muted">\${App.t("No parents added yet.")}</p>`;
+            html += `<p class="text-center text-muted">${App.t("No parents added yet.")}</p>`;
         } else {
             // Filter by class if active
             const filteredParents = window.currentClassFilter 
@@ -719,7 +719,7 @@ const App = {
                 : parents;
 
             if (filteredParents.length === 0) {
-                html += `<p class="text-center text-muted">\${App.t("No parents found in this class.")}</p>`;
+                html += `<p class="text-center text-muted">${App.t("No parents found in this class.")}</p>`;
             } else {
                 // Sort by serial number or fallback to original index
                 filteredParents.sort((a, b) => {
@@ -810,7 +810,7 @@ const App = {
                     <input type="number" name="serialNo" class="form-control" value="${nextSerial}" required>
                 </div>
                 <div class="form-group">
-                    <label>\${App.t("Parent Name *")}</label>
+                    <label>${App.t("Parent Name *")}</label>
                     <input type="text" name="parentName" class="form-control" required>
                 </div>
                 <div class="form-group">
@@ -826,11 +826,11 @@ const App = {
                     <label>Monthly Fee (₹) *</label>
                     <input type="number" name="monthlyFee" class="form-control" inputmode="numeric" required>
                 </div>
-                <button type="submit" class="btn btn-primary mt-4">\${App.t("Save Parent")}</button>
+                <button type="submit" class="btn btn-primary mt-4">${App.t("Save Parent")}</button>
             </form>
         `;
         
-        UI.openModal('\${App.t("Add Parent")}', content, (modal, closeFunc) => {
+        UI.openModal('${App.t("Add Parent")}', content, (modal, closeFunc) => {
             modal.querySelector('#addParentForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const fd = new FormData(e.target);
@@ -893,7 +893,7 @@ const App = {
                     <input type="number" name="serialNo" class="form-control" value="${currentSerial}" required>
                 </div>
                 <div class="form-group">
-                    <label>\${App.t("Parent Name *")}</label>
+                    <label>${App.t("Parent Name *")}</label>
                     <input type="text" name="parentName" class="form-control" value="${parent.parentName}" required>
                 </div>
                 <div class="form-group">
@@ -909,7 +909,7 @@ const App = {
                     <label>Monthly Fee (₹) *</label>
                     <input type="number" name="monthlyFee" class="form-control" value="${parent.monthlyFee}" inputmode="numeric" required>
                 </div>
-                <button type="submit" class="btn btn-primary mt-4">\${App.t("Update Parent")}</button>
+                <button type="submit" class="btn btn-primary mt-4">${App.t("Update Parent")}</button>
             </form>
         `;
         
@@ -1868,10 +1868,10 @@ const App = {
                 
                 <div class="flex gap-4" style="flex-direction: column;">
                     <button class="btn btn-secondary" style="border-color: var(--primary-600); color: var(--primary-600);" onclick="App.openImportParentsModal()">
-                        <i data-lucide="upload"></i> \${App.t("Import Parents (Excel)")}
+                        <i data-lucide="upload"></i> ${App.t("Import Parents (Excel)")}
                     </button>
                     <button class="btn btn-secondary" onclick="App.exportParents()">
-                        <i data-lucide="users"></i> \${App.t("Export All Parents (Excel)")}
+                        <i data-lucide="users"></i> ${App.t("Export All Parents (Excel)")}
                     </button>
                     <button class="btn btn-secondary" onclick="App.openExportPaymentsModal()">
                         <i data-lucide="table"></i> Export This Month Payments (Excel)
@@ -1884,7 +1884,7 @@ const App = {
             
             <div class="card mt-4" style="border: 1px solid var(--danger); background: rgba(239, 68, 68, 0.05);">
                 <h3 style="color: var(--danger);">Danger Zone</h3>
-                <p class="text-muted mb-4">\${App.t("Permanently delete all parents and payment records.")} This cannot be undone.</p>
+                <p class="text-muted mb-4">${App.t("Permanently delete all parents and payment records.")} This cannot be undone.</p>
                 <button class="btn" id="dangerZoneBtn" style="background: var(--danger); color: white; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3); opacity: ${window.isDangerUnlocked ? '1' : '0.7'}; display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 10px 16px;" onclick="if(window.isDangerUnlocked) { App.clearDatabase(); } else { UI.showToast('Please tap the lock icon to unlock this action.', 'info'); }">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <i data-lucide="trash-2"></i> Clear Database Completely
