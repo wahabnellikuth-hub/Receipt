@@ -1627,12 +1627,24 @@ const App = {
             if (stored) savedTemplate = typeof stored === 'object' ? (stored.value || defaultTemplate) : stored;
         } catch(e) {}
 
+        // Fetch all parents and classes once concurrently for speed
+        const [allParents, allClasses] = await Promise.all([
+            db.parents.toArray(),
+            db.classes.toArray()
+        ]);
+        
+        const parentMap = {};
+        for(let pt of allParents) parentMap[pt.id] = pt;
+        
+        const classMap = {};
+        for(let cl of allClasses) classMap[cl.id] = cl;
+
         // Save data globally to regenerate the list when template changes
         window.currentPendingPayments = [];
         for(let p of payments) {
-            const parent = await db.parents.get(p.parentId);
+            const parent = parentMap[p.parentId];
             if (parent) {
-                const cls = await db.classes.get(parent.classId);
+                const cls = classMap[parent.classId];
                 window.currentPendingPayments.push({ payment: p, parent, cls });
             }
         }
