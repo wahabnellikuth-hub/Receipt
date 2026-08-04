@@ -258,10 +258,12 @@ const App = {
                         <i data-lucide="bell" style="width: 18px; height: 18px;"></i> 
                         Send Reminders
                     </button>
+                    ${generateReceipt ? `
                     <button class="btn" style="padding: 10px 16px; font-size: 0.9rem; background: var(--primary-600); color: white; border-radius: 12px; border: none; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: transform 0.2s;" onclick="App.openPosterGeneratorModal()" onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform='scale(1)'" onmouseleave="this.style.transform='scale(1)'">
                         <i data-lucide="bar-chart-2" style="width: 18px; height: 18px;"></i> 
                         Status Poster
                     </button>
+                    ` : ''}
                     <button class="btn" style="padding: 10px 16px; font-size: 0.9rem; background: #3b82f6; color: white; border-radius: 12px; border: none; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: transform 0.2s;" onclick="App.openStatusTextModal()" onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform='scale(1)'" onmouseleave="this.style.transform='scale(1)'">
                         <i data-lucide="file-text" style="width: 18px; height: 18px;"></i> 
                         Generate Status Text
@@ -269,6 +271,79 @@ const App = {
                 </div>
             </div>
             
+            <div style="margin-top: 40px; border-top: 1px solid var(--border-color); padding-top: 24px; padding-bottom: 24px;">
+                <h3 style="text-align: center; margin-bottom: 16px; color: var(--text-color);">Daily Report</h3>
+                <div style="display: flex; justify-content: center; margin-bottom: 16px;">
+                    <input type="date" id="dailySummaryDate" class="form-control" style="width: auto; padding: 8px 12px;" value="${(() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })()}" onchange="App.updateDailySummary()">
+                </div>
+                <div id="dailySummaryContent">
+                    <!-- Daily summary will be injected here -->
+                </div>
+            </div>
+        `;
+        setTimeout(() => App.updateDailySummary(), 100);
+    },
+
+    async updateDailySummary() {
+        const dateInput = document.getElementById('dailySummaryDate');
+        const container = document.getElementById('dailySummaryContent');
+        if (!dateInput || !container) return;
+
+        const selectedDate = dateInput.value;
+        if (!selectedDate) return;
+
+        const allPayments = await db.payments.where('status').equals('Paid').toArray();
+        const paymentsOnDate = allPayments.filter(p => p.date === selectedDate);
+        
+        let collectedBase = 0;
+        let collectedAdvance = 0;
+        let collectedUpi = 0;
+        let collectedCash = 0;
+        let collectedOnline = 0;
+        let upiCount = 0;
+        
+        const parents = await db.parents.toArray();
+
+        for (let p of paymentsOnDate) {
+            const parent = parents.find(x => x.id === p.parentId);
+            const fee = parent ? Number(parent.monthlyFee) : 0;
+            const amt = Number(p.amount);
+            
+            if (amt > fee && fee > 0) {
+                collectedBase += fee;
+                collectedAdvance += (amt - fee);
+            } else {
+                collectedBase += amt;
+            }
+            
+            if (p.method === 'UPI') {
+                collectedUpi += amt;
+                upiCount++;
+            } else if (p.method === 'Bank Transfer') {
+                collectedOnline += amt;
+            } else {
+                collectedCash += amt;
+            }
+        }
+
+        const totalCollected = collectedBase + collectedAdvance;
+
+        container.innerHTML = `
+            <div class="metrics-grid">
+                <div class="metric-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                    <p style="color: rgba(255,255,255,0.9);">Total Collected</p>
+                    <div class="metric-value">₹${totalCollected.toLocaleString('en-IN')}</div>
+                    <div style="margin-top: 8px; font-size: 0.85em; font-weight: 500; opacity: 0.9;">
+                        Cash: ₹${collectedCash.toLocaleString('en-IN')} | UPI: ₹${collectedUpi.toLocaleString('en-IN')}
+                    </div>
+                </div>
+                <div class="metric-card" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);">
+                    <p style="color: rgba(255,255,255,0.9);">Paid Members</p>
+                    <div class="metric-value">${paymentsOnDate.length}</div>
+                    <div style="margin-top: 8px; font-size: 0.85em; font-weight: 500; opacity: 0.9;">
+                        via UPI: ${upiCount}
+                    </div>
+                </div>
             </div>
         `;
     },
@@ -1180,7 +1255,7 @@ const App = {
                 </div>
                 <div class="form-group">
                     <label>Payment Date</label>
-                    <input type="date" name="date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
+                    <input type="date" name="date" class="form-control" value="${(() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })()}" required>
                 </div>
                 <button type="submit" class="btn btn-primary mt-4">${generateReceipt ? 'Record & Generate Receipt' : 'Record Payment'}</button>
             </form>
