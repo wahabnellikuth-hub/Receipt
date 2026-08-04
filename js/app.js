@@ -2095,7 +2095,7 @@ const App = {
                     return;
                 }
                 
-                UI.showToast(\`Importing \${rows.length} parents... Please wait.\`, 'info');
+                UI.showToast(App.t(`Importing ${rows.length} parents... Please wait.`), 'info');
                 
                 const classes = await db.classes.toArray();
                 const parents = await db.parents.toArray();
@@ -2145,7 +2145,7 @@ const App = {
                     successCount++;
                 }
                 
-                UI.showToast(\`Successfully imported \${successCount} parents!\`, 'success');
+                UI.showToast(App.t(`Successfully imported ${successCount} parents!`), 'success');
                 const closeBtn = document.querySelector('.modal-close');
                 if (closeBtn) closeBtn.click();
                 
