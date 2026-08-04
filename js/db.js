@@ -14,15 +14,36 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
+// Multi-tenancy: Get Madrasa ID from URL or localStorage
+function getActiveMadrasa() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const mFromUrl = urlParams.get('m');
+    if (mFromUrl) {
+        localStorage.setItem('activeMadrasa', mFromUrl);
+        return mFromUrl;
+    }
+    const stored = localStorage.getItem('activeMadrasa');
+    if (stored) return stored;
+    return 'default';
+}
+
+function getDbPath(path) {
+    const madrasaId = getActiveMadrasa();
+    if (madrasaId === 'default') {
+        return path; // keep backward compatibility for existing primary madrasa
+    }
+    return `madrasas/${madrasaId}/${path}`;
+}
+
 // Facade to mimic Dexie API for app.js
 const db = {
     open: async () => {
         // Seed Initial Data (if classes are empty)
         try {
-            const snap = await database.ref('classes').once('value');
+            const snap = await database.ref(getDbPath('classes')).once('value');
             if (!snap.exists()) {
                 for (let i = 1; i <= 10; i++) {
-                    await database.ref(`classes/${i}`).set({ name: `Class ${i}` });
+                    await database.ref(getDbPath(`classes/${i}`)).set({ name: `Class ${i}` });
                 }
             }
         } catch (error) {
@@ -33,7 +54,7 @@ const db = {
     
     classes: {
         toArray: async () => {
-            const snap = await database.ref('classes').once('value');
+            const snap = await database.ref(getDbPath('classes')).once('value');
             const val = snap.val() || {};
             return Object.keys(val).map(k => ({id: String(k), ...val[k]}));
         },
@@ -42,14 +63,14 @@ const db = {
             return arr.length;
         },
         get: async (id) => {
-            const snap = await database.ref(`classes/${id}`).once('value');
+            const snap = await database.ref(getDbPath(`classes/${id}`)).once('value');
             return snap.exists() ? {id: String(id), ...snap.val()} : null;
         }
     },
 
     parents: {
         toArray: async () => {
-            const snap = await database.ref('parents').once('value');
+            const snap = await database.ref(getDbPath('parents')).once('value');
             const val = snap.val() || {};
             return Object.keys(val).map(k => ({id: String(k), ...val[k]}));
         },
@@ -58,25 +79,25 @@ const db = {
             return arr.length;
         },
         get: async (id) => {
-            const snap = await database.ref(`parents/${id}`).once('value');
+            const snap = await database.ref(getDbPath(`parents/${id}`)).once('value');
             return snap.exists() ? {id: String(id), ...snap.val()} : null;
         },
         add: async (data) => {
-            const newRef = database.ref('parents').push();
+            const newRef = database.ref(getDbPath('parents')).push();
             await newRef.set(data);
             return newRef.key;
         },
         update: async (id, data) => {
-            await database.ref(`parents/${id}`).update(data);
+            await database.ref(getDbPath(`parents/${id}`)).update(data);
         },
         delete: async (id) => {
-            await database.ref(`parents/${id}`).remove();
+            await database.ref(getDbPath(`parents/${id}`)).remove();
         }
     },
 
     payments: {
         toArray: async () => {
-            const snap = await database.ref('payments').once('value');
+            const snap = await database.ref(getDbPath('payments')).once('value');
             const val = snap.val() || {};
             return Object.keys(val).map(k => ({id: String(k), ...val[k]}));
         },
@@ -85,7 +106,7 @@ const db = {
                 equals: function(value) {
                     return {
                         toArray: async () => {
-                            const snap = await database.ref('payments').orderByChild(field).equalTo(value).once('value');
+                            const snap = await database.ref(getDbPath('payments')).orderByChild(field).equalTo(value).once('value');
                             const val = snap.val() || {};
                             return Object.keys(val).map(k => ({id: String(k), ...val[k]}));
                         },
@@ -98,33 +119,33 @@ const db = {
             }
         },
         get: async (id) => {
-            const snap = await database.ref(`payments/${id}`).once('value');
+            const snap = await database.ref(getDbPath(`payments/${id}`)).once('value');
             return snap.exists() ? {id: String(id), ...snap.val()} : null;
         },
         add: async (data) => {
-            const newRef = database.ref('payments').push();
+            const newRef = database.ref(getDbPath('payments')).push();
             await newRef.set(data);
             return newRef.key;
         },
         update: async (id, data) => {
-            await database.ref(`payments/${id}`).update(data);
+            await database.ref(getDbPath(`payments/${id}`)).update(data);
         },
         bulkDelete: async (ids) => {
             const updates = {};
             ids.forEach(id => {
                 updates[id] = null;
             });
-            await database.ref('payments').update(updates);
+            await database.ref(getDbPath('payments')).update(updates);
         }
     },
 
     settings: {
         get: async (key) => {
-            const snap = await database.ref(`settings/${key}`).once('value');
+            const snap = await database.ref(getDbPath(`settings/${key}`)).once('value');
             return snap.val();
         },
         set: async (key, value) => {
-            await database.ref(`settings/${key}`).set(value);
+            await database.ref(getDbPath(`settings/${key}`)).set(value);
         }
     }
 };
