@@ -91,6 +91,12 @@ const App = {
         UI.showToast(value ? 'Members Terminology Enabled' : 'Members Terminology Disabled');
     },
 
+    async toggleGenerateReceipt(value) {
+        await db.settings.set('generateReceipt', value);
+        this.renderPage('settings');
+        UI.showToast(value ? 'Receipt Generation Enabled' : 'Receipt Generation Disabled');
+    },
+
     toggleAppPrefsLock() {
         if (window.isAppPrefsUnlocked) {
             window.isAppPrefsUnlocked = false;
@@ -129,7 +135,10 @@ const App = {
         const paid = paymentsThisMonth.filter(p => p.status === 'Paid');
         const pending = paymentsThisMonth.filter(p => p.status === 'Pending');
         
-        const unsentMessages = paid.filter(p => !p.textSent || !p.receiptSent);
+        let generateReceipt = true;
+        try { const stored = await db.settings.get('generateReceipt'); if (stored !== undefined && stored !== null) generateReceipt = stored; } catch(e) {}
+        
+        const unsentMessages = paid.filter(p => !p.textSent || (!p.receiptSent && generateReceipt));
         
         let collectedBase = 0;
         let collectedAdvance = 0;
@@ -238,7 +247,7 @@ const App = {
             
             <div style="text-align: center; margin-top: 24px; display: flex; flex-direction: column; align-items: center; gap: 8px;">
                 <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-                    ${unsentMessages.length > 0 ? `
+                    ${(generateReceipt && unsentMessages.length > 0) ? `
                         <button class="btn" style="position: relative; padding: 10px 16px; font-size: 0.9rem; background: #25D366; color: white; border-radius: 12px; border: none; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3); transition: transform 0.2s;" onclick="App.openUnsentReceiptsModal()" onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform='scale(1)'" onmouseleave="this.style.transform='scale(1)'">
                             <i data-lucide="message-circle" style="width: 18px; height: 18px;"></i> 
                             Pending Messages
@@ -1140,14 +1149,19 @@ const App = {
             if (globalSaved) settings = { ...settings, ...globalSaved };
         } catch(e) {}
         
+        let generateReceipt = true;
+        try { const stored = await db.settings.get('generateReceipt'); if (stored !== undefined && stored !== null) generateReceipt = stored; } catch(e) {}
+        
         const content = `
             <form id="recordPaymentForm">
+                ${generateReceipt ? `
                 <div class="form-group">
                     <label>Receipt Number</label>
                     <div style="display: flex; gap: 8px; align-items: center;">
                         <input type="number" name="receiptNumber" class="form-control" style="flex: 1;" value="${settings.nextReceiptNumber || 1}" inputmode="numeric" required>
                     </div>
                 </div>
+                ` : ''}
                 <div class="form-group">
                     <label>Number of Months Paid</label>
                     <input type="number" id="monthsPaid" name="monthsPaid" class="form-control" value="1" min="1" max="12" inputmode="numeric" required oninput="document.getElementById('amountInput').value = this.value * ${parent.monthlyFee}">
@@ -1168,7 +1182,7 @@ const App = {
                     <label>Payment Date</label>
                     <input type="date" name="date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
                 </div>
-                <button type="submit" class="btn btn-primary mt-4">Record & Generate Receipt</button>
+                <button type="submit" class="btn btn-primary mt-4">${generateReceipt ? 'Record & Generate Receipt' : 'Record Payment'}</button>
             </form>
         `;
         
@@ -1178,14 +1192,16 @@ const App = {
                 const fd = new FormData(e.target);
                 
                 try {
-                    const num = fd.get('receiptNumber');
-                    const receiptNo = `${num}`;
+                    let receiptNo = null;
+                    if (generateReceipt) {
+                        const num = fd.get('receiptNumber');
+                        receiptNo = `${num}`;
+                        settings.nextReceiptNumber = Number(num) + 1;
+                        await db.settings.set('receiptSettings', settings);
+                        localStorage.setItem('receiptSettings', JSON.stringify(settings));
+                    }
                     const monthsPaid = Number(fd.get('monthsPaid')) || 1;
                     const totalAmount = Number(fd.get('amount'));
-                    
-                    settings.nextReceiptNumber = Number(num) + 1;
-                    await db.settings.set('receiptSettings', settings);
-                    localStorage.setItem('receiptSettings', JSON.stringify(settings));
                     
                     let receiptMonthText = formatMonthYear(payment.month);
                     if (monthsPaid > 1) {
@@ -1248,8 +1264,10 @@ const App = {
                     closeFunc();
                     App.renderPage('payments');
                     
-                    // Immediately show receipt options
-                    App.viewReceipt(paymentId);
+                    if (generateReceipt) {
+                        // Immediately show receipt options
+                        App.viewReceipt(paymentId);
+                    }
                 } catch(err) {
                     UI.showToast('Error recording payment', 'error');
                 }
@@ -1412,10 +1430,12 @@ const App = {
             <div style="border: 1px dashed var(--border-color); padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
                 <h4 style="margin-bottom: 4px;">Madrassa Management</h4>
                 <p class="text-muted" style="font-size: 0.8em; margin-bottom: 12px;">Payment Receipt</p>
+                ${generateReceipt ? `
                 <div class="flex justify-between" style="text-align: left; font-size: 0.9em; margin-bottom: 8px;">
                     <span>Receipt No:</span>
                     <strong>${payment.receiptNo}</strong>
                 </div>
+                ` : ''}
                 <div class="flex justify-between" style="text-align: left; font-size: 0.9em; margin-bottom: 8px;">
                     <span>Date:</span>
                     <strong>${formatDate(payment.date)}</strong>
@@ -1443,9 +1463,11 @@ const App = {
                 <button class="btn btn-primary" style="background: #25D366; border: none;" onclick="App.openWhatsApp('${paymentId}')">
                     <i data-lucide="message-circle"></i> Open WhatsApp
                 </button>
+                ${generateReceipt ? `
                 <button class="btn btn-secondary" onclick="App.generateJPG('${paymentId}')">
                     <i data-lucide="download"></i> Download JPG
                 </button>
+                ` : ''}
                 <button class="btn" style="border: 1px solid var(--danger); color: var(--danger); background: transparent;" onclick="App.undoPayment('${paymentId}')">
                     <i data-lucide="undo"></i> Undo Payment
                 </button>
@@ -1823,6 +1845,9 @@ const App = {
         let useMembersTerminology = false;
         try { const stored = await db.settings.get('useMembersTerminology'); if (stored) useMembersTerminology = true; } catch(e) {}
 
+        let generateReceipt = true;
+        try { const stored = await db.settings.get('generateReceipt'); if (stored !== undefined && stored !== null) generateReceipt = stored; } catch(e) {}
+
         container.innerHTML = `
             <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
                 <h2 style="margin: 0;">Settings</h2>
@@ -1839,6 +1864,7 @@ const App = {
                 </button>
             </div>
 
+            ${generateReceipt ? `
             <div class="card mt-4">
                 <h3>Receipt Template</h3>
                 <p class="text-muted mb-4">Customize the visual template and coordinates for generating receipts.</p>
@@ -1851,6 +1877,7 @@ const App = {
                     </div>
                 </button>
             </div>
+            ` : ''}
 
             <div class="card mt-4">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
@@ -1870,12 +1897,21 @@ const App = {
                             </span>
                         </label>
                     </div>
-                    <div class="flex justify-between align-center mt-2">
+                    <div class="flex justify-between align-center mt-2" style="margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
                         <span style="font-weight: 500;">Use 'Members' Terminology</span>
                         <label class="switch" style="position: relative; display: inline-block; width: 44px; height: 24px;">
                             <input type="checkbox" ${useMembersTerminology ? 'checked' : ''} onchange="App.toggleMembersTerminology(this.checked)" style="opacity: 0; width: 0; height: 0;">
                             <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: ${useMembersTerminology ? 'var(--primary-600)' : '#ccc'}; transition: .4s; border-radius: 24px;">
                                 <span style="position: absolute; content: ''; height: 18px; width: 18px; left: ${useMembersTerminology ? '23px' : '3px'}; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%;"></span>
+                            </span>
+                        </label>
+                    </div>
+                    <div class="flex justify-between align-center mt-2">
+                        <span style="font-weight: 500;">Generate Receipt</span>
+                        <label class="switch" style="position: relative; display: inline-block; width: 44px; height: 24px;">
+                            <input type="checkbox" ${generateReceipt ? 'checked' : ''} onchange="App.toggleGenerateReceipt(this.checked)" style="opacity: 0; width: 0; height: 0;">
+                            <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: ${generateReceipt ? 'var(--primary-600)' : '#ccc'}; transition: .4s; border-radius: 24px;">
+                                <span style="position: absolute; content: ''; height: 18px; width: 18px; left: ${generateReceipt ? '23px' : '3px'}; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%;"></span>
                             </span>
                         </label>
                     </div>
