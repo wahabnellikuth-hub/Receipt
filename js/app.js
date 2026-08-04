@@ -1624,7 +1624,7 @@ const App = {
         let savedTemplate = defaultTemplate;
         try {
             const stored = await db.settings.get('reminderTemplate');
-            if (stored) savedTemplate = stored;
+            if (stored) savedTemplate = typeof stored === 'object' ? (stored.value || defaultTemplate) : stored;
         } catch(e) {}
 
         // Save data globally to regenerate the list when template changes
@@ -1639,14 +1639,8 @@ const App = {
         window.currentPendingPayments.sort((a, b) => (a.parent.serialNo || 0) - (b.parent.serialNo || 0));
         
         const content = `
-            <div style="background: var(--bg-color); padding: 16px; border-radius: 12px; margin-bottom: 16px; border: 1px solid var(--border-color);">
-                <label style="font-weight: 600; display: block; margin-bottom: 4px;">Message Template</label>
-                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Use placeholders: <code>{month}</code>, <code>{parent}</code>, <code>{class}</code>, <code>{fee}</code></p>
-                <textarea id="reminderTemplateInput" class="form-control" rows="5" style="resize: vertical; font-size: 0.9em; margin-bottom: 12px;">${savedTemplate}</textarea>
-                <button class="btn btn-primary" style="width: 100%;" onclick="App.saveReminderTemplate()">Update & Save Template</button>
-            </div>
             <p style="margin-bottom: 12px;">There are <strong>${payments.length}</strong> pending payments for ${formatMonthYear(currentMonth)}.</p>
-            <div id="reminderQueue" style="max-height: 350px; overflow-y: auto;"></div>
+            <div id="reminderQueue" style="max-height: 450px; overflow-y: auto;"></div>
         `;
         
         UI.openModal('Send Reminders', content, async (modal) => {
@@ -1658,12 +1652,13 @@ const App = {
         const template = document.getElementById('reminderTemplateInput').value;
         await db.settings.set('reminderTemplate', template);
         UI.showToast('Template saved successfully!');
-        App.renderReminderQueue(template);
     },
 
     renderReminderQueue(template) {
         const queueContainer = document.getElementById('reminderQueue');
         if(!queueContainer) return;
+        
+        if (typeof template !== 'string') template = "";
         
         const currentMonth = getActiveMonth();
         const monthText = formatMonthYear(currentMonth);
@@ -1680,6 +1675,7 @@ const App = {
                 .replace(/{fee}/g, parent.monthlyFee);
                 
             const encodedMsg = encodeURIComponent(msg);
+            const cleanPhone = String(parent.whatsappNumber || '').replace(/[^0-9]/g, '');
             
             html += `
                 <div class="list-item" style="padding: 12px; margin-bottom: 8px;">
@@ -1687,7 +1683,7 @@ const App = {
                         <h4 style="margin: 0; font-size: 1rem;">${parent.serialNo || ''}. ${parent.parentName}</h4>
                         <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">${className} • ₹${parent.monthlyFee}</p>
                     </div>
-                    <a href="https://wa.me/${parent.whatsappNumber}?text=${encodedMsg}" target="_blank" class="btn" style="width: auto; padding: 8px 16px; background: #25D366; color: white; border-radius: 8px; border: none; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;" onclick="this.style.opacity='0.5';">
+                    <a href="https://wa.me/${cleanPhone}?text=${encodedMsg}" target="_blank" class="btn" style="width: auto; padding: 8px 16px; background: #25D366; color: white; border-radius: 8px; border: none; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;" onclick="this.style.opacity='0.5';">
                         <i data-lucide="send" style="width: 16px; height: 16px;"></i> Send
                     </a>
                 </div>
@@ -1923,6 +1919,13 @@ const App = {
         let generateReceipt = true;
         try { const stored = await db.settings.get('generateReceipt'); if (stored !== undefined && stored !== null) generateReceipt = stored; } catch(e) {}
 
+        let defaultTemplate = "Assalamu Alaikum.\n\nThis is a gentle reminder that the Madrassa monthly fee for *{month}* is still pending.\n\nParent: {parent}\nClass: {class}\nMonthly Fee: ₹{fee}\n\nKindly make the payment at your earliest convenience.\n\nJazakumullahu Khair.";
+        let reminderTemplate = defaultTemplate;
+        try {
+            const stored = await db.settings.get('reminderTemplate');
+            if (stored) reminderTemplate = typeof stored === 'object' ? (stored.value || defaultTemplate) : stored;
+        } catch(e) {}
+
         container.innerHTML = `
             <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
                 <h2 style="margin: 0;">Settings</h2>
@@ -1937,6 +1940,13 @@ const App = {
                 <button class="btn btn-secondary" onclick="App.openDashboardDisplayModal()">
                     <i data-lucide="edit-3"></i> Edit Institution Name
                 </button>
+            </div>
+
+            <div class="card mt-4">
+                <h3>WhatsApp Reminder Template</h3>
+                <p class="text-muted mb-4" style="font-size: 0.85rem;">Use placeholders: <code>{month}</code>, <code>{parent}</code>, <code>{class}</code>, <code>{fee}</code></p>
+                <textarea id="reminderTemplateInput" class="form-control" rows="5" style="resize: vertical; font-size: 0.9em; margin-bottom: 12px; width: 100%;">${reminderTemplate}</textarea>
+                <button class="btn btn-primary" style="width: 100%;" onclick="App.saveReminderTemplate()">Update & Save Template</button>
             </div>
 
             ${generateReceipt ? `
