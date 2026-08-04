@@ -1830,6 +1830,9 @@ const App = {
                 <p class="text-muted mb-4">Download comprehensive reports in XLSX or PDF format.</p>
                 
                 <div class="flex gap-4" style="flex-direction: column;">
+                    <button class="btn btn-secondary" style="border-color: var(--primary-600); color: var(--primary-600);" onclick="App.openImportParentsModal()">
+                        <i data-lucide="upload"></i> Import Parents (Excel)
+                    </button>
                     <button class="btn btn-secondary" onclick="App.exportParents()">
                         <i data-lucide="users"></i> Export All Parents (Excel)
                     </button>
@@ -2000,6 +2003,125 @@ const App = {
         XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
         XLSX.writeFile(workbook, fileName);
         UI.showToast("Exported Successfully!");
+    },
+
+    openImportParentsModal() {
+        const content = `
+            <div style="margin-bottom: 20px;">
+                <p class="text-muted" style="margin-bottom: 12px; font-size: 0.9em;">Step 1: Download the blank template and fill it out.</p>
+                <button class="btn btn-secondary" style="width: 100%;" onclick="App.downloadImportTemplate()">
+                    <i data-lucide="download"></i> Download Template
+                </button>
+            </div>
+            <div style="border-top: 1px solid var(--border-color); padding-top: 20px;">
+                <p class="text-muted" style="margin-bottom: 12px; font-size: 0.9em;">Step 2: Upload your filled Excel file.</p>
+                <input type="file" id="importExcelInput" accept=".xlsx, .xls, .csv" class="form-control" style="padding: 8px;">
+                <button class="btn btn-primary" style="width: 100%; margin-top: 12px;" onclick="App.processImportExcel()">
+                    <i data-lucide="upload"></i> Start Import
+                </button>
+            </div>
+        `;
+        UI.openModal('Import Parents', content);
+    },
+
+    async downloadImportTemplate() {
+        const headers = [{
+            'Serial Number': '',
+            'Parent Name': '',
+            'Student Name': '',
+            'WhatsApp Number': '',
+            'Monthly Fee': '',
+            'Class': ''
+        }];
+        this.downloadExcel(headers, 'Madrassa_Import_Template.xlsx');
+    },
+
+    async processImportExcel() {
+        const fileInput = document.getElementById('importExcelInput');
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            UI.showToast('Please select a file first.', 'error');
+            return;
+        }
+        
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+        
+        reader.onload = async (e) => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = window.XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.SheetNames[0];
+                const rows = window.XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet]);
+                
+                if (rows.length === 0) {
+                    UI.showToast('The file is empty.', 'error');
+                    return;
+                }
+                
+                UI.showToast(\`Importing \${rows.length} parents... Please wait.\`, 'info');
+                
+                const classes = await db.classes.toArray();
+                const parents = await db.parents.toArray();
+                let maxSerial = 0;
+                parents.forEach((p, index) => {
+                    const sn = p.serialNo !== undefined ? Number(p.serialNo) : (index + 1);
+                    if (sn > maxSerial) maxSerial = sn;
+                });
+                
+                let successCount = 0;
+                const currentMonth = getActiveMonth();
+                
+                for (let row of rows) {
+                    if (!row['Parent Name'] || !row['Monthly Fee']) continue;
+                    
+                    let classId = classes[0] ? classes[0].id : '';
+                    if (row['Class']) {
+                        const matchedClass = classes.find(c => c.name.toLowerCase() === String(row['Class']).toLowerCase());
+                        if (matchedClass) {
+                            classId = matchedClass.id;
+                        }
+                    }
+                    
+                    let serialNo = row['Serial Number'] ? Number(row['Serial Number']) : ++maxSerial;
+                    
+                    const newId = await db.parents.add({
+                        serialNo: serialNo,
+                        parentName: String(row['Parent Name']),
+                        studentName: row['Student Name'] ? String(row['Student Name']) : '',
+                        classId: classId,
+                        whatsappNumber: row['WhatsApp Number'] ? String(row['WhatsApp Number']).replace(/\\D/g,'') : '',
+                        monthlyFee: Number(row['Monthly Fee']),
+                        notes: ''
+                    });
+                    
+                    await db.payments.add({
+                        parentId: newId,
+                        month: currentMonth,
+                        status: 'Pending',
+                        amount: 0,
+                        date: null,
+                        method: null,
+                        remarks: '',
+                        receiptNo: null
+                    });
+                    
+                    successCount++;
+                }
+                
+                UI.showToast(\`Successfully imported \${successCount} parents!\`, 'success');
+                const closeBtn = document.querySelector('.modal-close');
+                if (closeBtn) closeBtn.click();
+                
+                const activeNav = document.querySelector('.nav-item.active');
+                if (activeNav) App.renderPage(activeNav.dataset.target);
+                
+            } catch (err) {
+                console.error(err);
+                UI.showToast('Error reading the Excel file.', 'error');
+            }
+        };
+        
+        reader.readAsArrayBuffer(file);
     },
 
     formatPosterDate(rawString) {
