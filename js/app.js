@@ -337,7 +337,10 @@ const App = {
                         Cash: ₹${collectedCash.toLocaleString('en-IN')} | UPI: ₹${collectedUpi.toLocaleString('en-IN')}
                     </div>
                 </div>
-                <div class="metric-card" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);">
+                <div class="metric-card" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); position: relative;">
+                    <div style="position: absolute; top: 12px; right: 12px; cursor: pointer;" onclick="App.viewDailyPaidMembers('${selectedDate}')" title="View Paid Members">
+                        <i data-lucide="eye" style="color: white; width: 20px; height: 20px; opacity: 0.9;"></i>
+                    </div>
                     <p style="color: rgba(255,255,255,0.9);">Paid Members</p>
                     <div class="metric-value">${paymentsOnDate.length}</div>
                     <div style="margin-top: 8px; font-size: 0.85em; font-weight: 500; opacity: 0.9;">
@@ -346,6 +349,54 @@ const App = {
                 </div>
             </div>
         `;
+        lucide.createIcons({ root: container });
+    },
+
+    async viewDailyPaidMembers(date) {
+        const allPayments = await db.payments.where('status').equals('Paid').toArray();
+        const paymentsOnDate = allPayments.filter(p => p.date === date);
+        const parents = await db.parents.toArray();
+        
+        if (paymentsOnDate.length === 0) {
+            UI.showToast('No payments found for this date.', 'info');
+            return;
+        }
+
+        let html = '<div style="max-height: 400px; overflow-y: auto;">';
+        
+        let enriched = paymentsOnDate.map(p => {
+            const parentIndex = parents.findIndex(x => x.id === p.parentId);
+            const parent = parents[parentIndex];
+            const serial = (parent && parent.serialNo !== undefined) ? parent.serialNo : (parentIndex >= 0 ? parentIndex + 1 : 999);
+            return { 
+                payment: p, 
+                parent: parent || { parentName: 'Unknown' },
+                displaySerial: serial
+            };
+        });
+        
+        enriched.sort((a, b) => a.displaySerial - b.displaySerial);
+
+        enriched.forEach(item => {
+            const isUpi = item.payment.method === 'UPI';
+            const serialText = item.displaySerial !== 999 ? `${item.displaySerial}. ` : '';
+            html += `
+                <div class="list-item" style="padding: 12px; margin-bottom: 8px;">
+                    <div class="list-item-content">
+                        <h4 style="margin: 0; font-size: 1rem;">${serialText}${item.parent.parentName || 'Unknown'}</h4>
+                        <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">
+                            Amount: ₹${item.payment.amount}
+                            ${isUpi ? '<span style="font-size: 0.75rem; background: #8b5cf6; color: white; padding: 2px 6px; border-radius: 12px; margin-left: 6px;">UPI ✅</span>' : ''}
+                        </p>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        
+        const displayDate = new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        UI.openModal(`Paid Members - ${displayDate}`, html);
     },
 
     async changeMonth(month) {
@@ -1648,13 +1699,15 @@ const App = {
         // Save data globally to regenerate the list when template changes
         window.currentPendingPayments = [];
         for(let p of payments) {
-            const parent = parentMap[p.parentId];
+            const parentIndex = allParents.findIndex(x => x.id === p.parentId);
+            const parent = allParents[parentIndex];
             if (parent) {
                 const cls = classMap[parent.classId];
-                window.currentPendingPayments.push({ payment: p, parent, cls });
+                const serial = parent.serialNo !== undefined ? parent.serialNo : (parentIndex >= 0 ? parentIndex + 1 : 999);
+                window.currentPendingPayments.push({ payment: p, parent, cls, displaySerial: serial });
             }
         }
-        window.currentPendingPayments.sort((a, b) => (a.parent.serialNo || 0) - (b.parent.serialNo || 0));
+        window.currentPendingPayments.sort((a, b) => a.displaySerial - b.displaySerial);
         
         const content = `
             <p style="margin-bottom: 12px;">There are <strong>${payments.length}</strong> pending payments for ${formatMonthYear(currentMonth)}.</p>
@@ -1683,7 +1736,7 @@ const App = {
         let html = '';
         
         for(let item of window.currentPendingPayments) {
-            const { parent, cls } = item;
+            const { payment, parent, cls } = item;
             const className = cls ? cls.name : 'Unknown';
             
             let msg = template
@@ -1695,20 +1748,71 @@ const App = {
             const encodedMsg = encodeURIComponent(msg);
             const cleanPhone = String(parent.whatsappNumber || '').replace(/[^0-9]/g, '');
             
+            const isSent = payment.reminderSent;
+            const serialText = item.displaySerial !== 999 ? `${item.displaySerial}. ` : '';
+            
             html += `
-                <div class="list-item" style="padding: 12px; margin-bottom: 8px;">
+                <div class="list-item" style="padding: 12px; margin-bottom: 8px; ${isSent ? 'background-color: rgba(37, 211, 102, 0.05); border-left: 3px solid #25D366;' : ''}">
                     <div class="list-item-content">
-                        <h4 style="margin: 0; font-size: 1rem;">${parent.serialNo || ''}. ${parent.parentName}</h4>
+                        <h4 style="margin: 0; font-size: 1rem;">
+                            ${serialText}${parent.parentName}
+                            ${isSent ? '<span style="font-size: 0.75rem; background: #25D366; color: white; padding: 2px 6px; border-radius: 12px; margin-left: 8px;">Sent ✅</span>' : ''}
+                        </h4>
                         <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">${className} • ₹${parent.monthlyFee}</p>
                     </div>
-                    <a href="https://wa.me/${cleanPhone}?text=${encodedMsg}" target="_blank" class="btn" style="width: auto; padding: 8px 16px; background: #25D366; color: white; border-radius: 8px; border: none; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;" onclick="this.style.opacity='0.5';">
-                        <i data-lucide="send" style="width: 16px; height: 16px;"></i> Send
-                    </a>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        ${isSent ? `
+                        <button type="button" class="btn btn-secondary" style="width: 36px; height: 36px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; border-color: var(--danger); color: var(--danger); flex-shrink: 0;" onclick="App.undoReminderSent('${payment.id}')" title="Undo Sent Status">
+                            <i data-lucide="undo" style="width: 16px; height: 16px; margin: 0;"></i>
+                        </button>
+                        ` : ''}
+                        <a href="https://wa.me/${cleanPhone}?text=${encodedMsg}" target="_blank" class="btn" style="width: auto; padding: 8px 16px; background: ${isSent ? 'var(--text-muted)' : '#25D366'}; color: white; border-radius: 8px; border: none; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;" onclick="App.markReminderSent('${payment.id}', this);">
+                            <i data-lucide="${isSent ? 'check' : 'send'}" style="width: 16px; height: 16px;"></i> ${isSent ? 'Send Again' : 'Send'}
+                        </a>
+                    </div>
                 </div>
             `;
         }
         queueContainer.innerHTML = html;
         lucide.createIcons({root: queueContainer});
+    },
+
+    async markReminderSent(paymentId, btnElement) {
+        if (btnElement) {
+            btnElement.style.opacity = '0.5';
+            btnElement.style.background = 'var(--text-muted)';
+            btnElement.innerHTML = '<i data-lucide="check" style="width: 16px; height: 16px;"></i> Sent';
+            lucide.createIcons({ root: btnElement });
+        }
+        try {
+            await db.payments.update(paymentId, { reminderSent: true });
+            if (window.currentPendingPayments) {
+                const item = window.currentPendingPayments.find(p => p.payment.id === paymentId);
+                if (item) item.payment.reminderSent = true;
+            }
+            // Add slight delay before re-rendering to allow link to open
+            setTimeout(() => {
+                const template = document.getElementById('reminderTemplateInput') ? document.getElementById('reminderTemplateInput').value : (window.currentReminderTemplate || '');
+                App.renderReminderQueue(template);
+            }, 500);
+        } catch (err) {
+            console.error(err);
+        }
+    },
+
+    async undoReminderSent(paymentId) {
+        try {
+            await db.payments.update(paymentId, { reminderSent: false });
+            if (window.currentPendingPayments) {
+                const item = window.currentPendingPayments.find(p => p.payment.id === paymentId);
+                if (item) item.payment.reminderSent = false;
+            }
+            const template = document.getElementById('reminderTemplateInput') ? document.getElementById('reminderTemplateInput').value : (window.currentReminderTemplate || '');
+            App.renderReminderQueue(template);
+        } catch (err) {
+            console.error(err);
+            UI.showToast('Error undoing reminder', 'error');
+        }
     },
 
     async generateJPG(paymentId) {
