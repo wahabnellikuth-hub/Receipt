@@ -201,6 +201,9 @@ const App = {
             <div style="text-align: center; margin-bottom: 24px;">
                 <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 16px;">
                     <h2 style="margin: 0;">Dashboard</h2>
+                    <button class="btn btn-secondary" style="width: 32px; height: 32px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center;" onclick="App.openPaymentHistoryReport()" title="Payment History Report">
+                        <i data-lucide="clipboard-list" style="width: 18px; height: 18px; margin: 0;"></i>
+                    </button>
                 </div>
                 <div style="display: flex; justify-content: center; gap: 8px; align-items: center; flex-wrap: wrap;">
                     <button class="btn btn-secondary" style="width: auto; padding: 4px 8px;" onclick="App.goToPreviousMonth()" title="Go to Previous Month">
@@ -413,6 +416,135 @@ const App = {
         const displayDate = new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
         UI.openModal(`Paid Members - ${displayDate}`, html);
     },
+
+    async openPaymentHistoryReport() {
+        const parents = await db.parents.toArray();
+        const payments = await db.payments.toArray();
+        const activeMonth = getActiveMonth();
+        
+        let months = [];
+        let [endY, endM] = activeMonth.split('-').map(Number);
+        
+        let curY = 2026;
+        let curM = 1;
+        while (curY < endY || (curY === endY && curM <= endM)) {
+            months.push(`${curY}-${String(curM).padStart(2, '0')}`);
+            curM++;
+            if (curM > 12) {
+                curM = 1;
+                curY++;
+            }
+        }
+        
+        const totalMonths = months.length;
+        
+        let reportData = parents.map(parent => {
+            let paidCount = 0;
+            let unpaidCount = 0;
+            let totalPaidAmount = 0;
+            let totalUnpaidAmount = 0;
+            const fee = Number(parent.monthlyFee) || 0;
+            
+            months.forEach(m => {
+                const p = payments.find(pay => pay.parentId === parent.id && pay.month === m);
+                if (p && p.status === 'Paid') {
+                    paidCount++;
+                } else {
+                    unpaidCount++;
+                    totalUnpaidAmount += fee;
+                }
+            });
+            
+            const parentPayments = payments.filter(pay => pay.parentId === parent.id && pay.status === 'Paid' && months.includes(pay.month));
+            parentPayments.forEach(pay => {
+                totalPaidAmount += Number(pay.amount || 0);
+            });
+            
+            const serial = parent.serialNo !== undefined ? parent.serialNo : 999;
+            
+            return {
+                parent,
+                serial,
+                paidCount,
+                unpaidCount,
+                totalPaidAmount,
+                totalUnpaidAmount
+            };
+        });
+        
+        reportData.sort((a, b) => a.serial - b.serial);
+        
+        let html = '<div style="max-height: 500px; overflow-y: auto;">';
+        
+        reportData.forEach(item => {
+            const serialText = item.serial !== 999 ? `${item.serial}. ` : '';
+            html += `
+                <div class="card" style="margin-bottom: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h4 style="margin: 0; font-size: 1.1rem; color: var(--primary-600);">${serialText}${item.parent.parentName}</h4>
+                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; display: flex; gap: 12px; flex-wrap: wrap;">
+                            <span>Paid: <strong style="color: #10b981;">${item.paidCount}</strong> (₹${item.totalPaidAmount})</span>
+                            <span>Pending: <strong style="color: var(--danger);">${item.unpaidCount}</strong> (₹${item.totalUnpaidAmount})</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary" style="width: 36px; height: 36px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="App.viewMemberPaymentHistory('${item.parent.id}')" title="View Detailed History">
+                        <i data-lucide="eye" style="width: 18px; height: 18px; margin: 0;"></i>
+                    </button>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        
+        UI.openModal('Payment History (Jan 2026 - Present)', html);
+    },
+
+    async viewMemberPaymentHistory(parentId) {
+        const parent = await db.parents.get(parentId);
+        if (!parent) return;
+        const payments = await db.payments.where('parentId').equals(parentId).toArray();
+        const activeMonth = getActiveMonth();
+        
+        let months = [];
+        let [endY, endM] = activeMonth.split('-').map(Number);
+        let curY = 2026;
+        let curM = 1;
+        while (curY < endY || (curY === endY && curM <= endM)) {
+            months.push(`${curY}-${String(curM).padStart(2, '0')}`);
+            curM++;
+            if (curM > 12) {
+                curM = 1;
+                curY++;
+            }
+        }
+        
+        let html = '<div style="max-height: 400px; overflow-y: auto;">';
+        html += `<h4 style="margin-top: 0; margin-bottom: 16px; color: var(--primary-600);">${parent.parentName} - History</h4>`;
+        
+        html += `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">`;
+        
+        months.forEach(m => {
+            const p = payments.find(pay => pay.month === m);
+            const isPaid = p && p.status === 'Paid';
+            const icon = isPaid ? '<i data-lucide="check-circle" style="color: #10b981; width: 18px; height: 18px;"></i>' : '<i data-lucide="x-circle" style="color: var(--danger); width: 18px; height: 18px;"></i>';
+            const statusText = isPaid ? 'Paid' : 'Pending';
+            
+            html += `
+                <div style="background: var(--background-color); padding: 8px 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border-color);">
+                    <span style="font-weight: 500; font-size: 0.9rem;">${formatMonthYear(m)}</span>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <span style="font-size: 0.8rem; color: var(--text-muted);">${statusText}</span>
+                        ${icon}
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div></div>';
+        
+        UI.openModal('Member Details', html);
+    },
+
 
     async changeMonth(month) {
         if(!month) return;
