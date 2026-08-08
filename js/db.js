@@ -195,11 +195,14 @@ async function generateMonthlyRecords() {
         if (cm > 12) { cm = 1; cy++; }
     }
     
-    // Get all parents and payments for these months concurrently
-    const [parents, allPayments] = await Promise.all([
+    // Get all parents and payments concurrently
+    const [parents, allPaymentsList] = await Promise.all([
         db.parents.toArray(),
-        db.payments.where('month').anyOf(months).toArray()
+        db.payments.toArray()
     ]);
+    
+    // Filter payments manually to simulate anyOf
+    const allPayments = allPaymentsList.filter(p => months.includes(p.month));
     
     const existingPaymentsMap = new Set();
     allPayments.forEach(p => {
