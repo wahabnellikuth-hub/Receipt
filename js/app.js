@@ -478,10 +478,15 @@ const App = {
         
         reportData.forEach(item => {
             const serialText = item.serial !== 999 ? `${item.serial}. ` : '';
+            const isFullyPaid = item.unpaidCount === 0;
+            const cardStyle = isFullyPaid 
+                ? 'margin-bottom: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #10b981; background-color: rgba(16, 185, 129, 0.05);'
+                : 'margin-bottom: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center;';
+                
             html += `
-                <div class="card" style="margin-bottom: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+                <div class="card" style="${cardStyle}">
                     <div>
-                        <h4 style="margin: 0; font-size: 1.1rem; color: var(--primary-600);">${serialText}${item.parent.parentName}</h4>
+                        <h4 style="margin: 0; font-size: 1.1rem; color: ${isFullyPaid ? '#10b981' : 'var(--primary-600)'};">${serialText}${item.parent.parentName}</h4>
                         <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; display: flex; gap: 12px; flex-wrap: wrap;">
                             <span>Paid: <strong style="color: #10b981;">${item.paidCount}</strong> (₹${item.totalPaidAmount})</span>
                             <span>Pending: <strong style="color: var(--danger);">${item.unpaidCount}</strong> (₹${item.totalUnpaidAmount})</span>
