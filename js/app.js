@@ -1146,17 +1146,8 @@ const App = {
                         monthlyFee: Number(fd.get('monthlyFee')),
                         notes: ''
                     });
-                    // Also generate current month payment record immediately
-                    await db.payments.add({
-                        parentId: newId,
-                        month: getActiveMonth(),
-                        status: 'Pending',
-                        amount: 0,
-                        date: null,
-                        method: null,
-                        remarks: '',
-                        receiptNo: null
-                    });
+                    // Generate pending records for all relevant months (Jan 2026 to current)
+                    await generateMonthlyRecords();
                     UI.showToast(App.t('Parent added successfully'));
                     closeFunc();
                     App.renderPage('classes');
@@ -2604,19 +2595,11 @@ const App = {
                         notes: ''
                     });
                     
-                    await db.payments.add({
-                        parentId: newId,
-                        month: currentMonth,
-                        status: 'Pending',
-                        amount: 0,
-                        date: null,
-                        method: null,
-                        remarks: '',
-                        receiptNo: null
-                    });
-                    
                     successCount++;
                 }
+                
+                // Generate all missing monthly records for the imported parents
+                await generateMonthlyRecords();
                 
                 UI.showToast(App.t(`Successfully imported ${successCount} parents!`), 'success');
                 const closeBtn = document.querySelector('.modal-close');

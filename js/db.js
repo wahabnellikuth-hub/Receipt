@@ -180,28 +180,47 @@ function setActiveMonth(monthStr) {
 async function generateMonthlyRecords() {
     const currentMonth = getActiveMonth();
     
-    // Get all parents and current month's payments concurrently for performance
-    const [parents, currentMonthPayments] = await Promise.all([
+    // Determine the range of months from 2026-01 to currentMonth
+    let endY = parseInt(currentMonth.substring(0, 4));
+    let endM = parseInt(currentMonth.substring(5, 7));
+    
+    // Ensure we don't go backwards if currentMonth is somehow before 2026 (edge case)
+    if (endY < 2026) return;
+    
+    const months = [];
+    let cy = 2026, cm = 1;
+    while (cy < endY || (cy === endY && cm <= endM)) {
+        months.push(`${cy}-${String(cm).padStart(2, '0')}`);
+        cm++;
+        if (cm > 12) { cm = 1; cy++; }
+    }
+    
+    // Get all parents and payments for these months concurrently
+    const [parents, allPayments] = await Promise.all([
         db.parents.toArray(),
-        db.payments.where('month').equals(currentMonth).toArray()
+        db.payments.where('month').anyOf(months).toArray()
     ]);
     
-    const parentsWithPayments = new Set(currentMonthPayments.map(p => p.parentId));
+    const existingPaymentsMap = new Set();
+    allPayments.forEach(p => {
+        existingPaymentsMap.add(`${p.month}_${p.parentId}`);
+    });
     
     const promises = [];
-    for (const parent of parents) {
-        if (!parentsWithPayments.has(parent.id)) {
-            // Create a pending record
-            promises.push(db.payments.add({
-                parentId: parent.id,
-                month: currentMonth,
-                status: 'Pending',
-                amount: 0,
-                date: null,
-                method: null,
-                remarks: '',
-                receiptNo: null
-            }));
+    for (const month of months) {
+        for (const parent of parents) {
+            if (!existingPaymentsMap.has(`${month}_${parent.id}`)) {
+                promises.push(db.payments.add({
+                    parentId: parent.id,
+                    month: month,
+                    status: 'Pending',
+                    amount: 0,
+                    date: null,
+                    method: null,
+                    remarks: '',
+                    receiptNo: null
+                }));
+            }
         }
     }
     
