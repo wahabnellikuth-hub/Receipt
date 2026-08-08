@@ -364,28 +364,39 @@ const App = {
 
         let html = '<div style="max-height: 400px; overflow-y: auto;">';
         
-        let enriched = paymentsOnDate.map(p => {
-            const parentIndex = parents.findIndex(x => x.id === p.parentId);
-            const parent = parents[parentIndex];
-            const serial = (parent && parent.serialNo !== undefined) ? parent.serialNo : (parentIndex >= 0 ? parentIndex + 1 : 999);
-            return { 
-                payment: p, 
-                parent: parent || { parentName: 'Unknown' },
-                displaySerial: serial
-            };
+        let aggregated = {};
+        paymentsOnDate.forEach(p => {
+            if (!aggregated[p.parentId]) {
+                const parentIndex = parents.findIndex(x => x.id === p.parentId);
+                const parent = parents[parentIndex];
+                const serial = (parent && parent.serialNo !== undefined) ? parent.serialNo : (parentIndex >= 0 ? parentIndex + 1 : 999);
+                aggregated[p.parentId] = {
+                    totalAmount: 0,
+                    monthsCount: 0,
+                    methods: new Set(),
+                    parent: parent || { parentName: 'Unknown' },
+                    displaySerial: serial
+                };
+            }
+            aggregated[p.parentId].totalAmount += Number(p.amount);
+            aggregated[p.parentId].monthsCount += 1;
+            aggregated[p.parentId].methods.add(p.method);
         });
-        
+
+        let enriched = Object.values(aggregated);
         enriched.sort((a, b) => a.displaySerial - b.displaySerial);
 
         enriched.forEach(item => {
-            const isUpi = item.payment.method === 'UPI';
+            const isUpi = item.methods.has('UPI');
             const serialText = item.displaySerial !== 999 ? `${item.displaySerial}. ` : '';
+            const monthsText = item.monthsCount > 1 ? ` <span style="font-weight: 500;">(Months = ${item.monthsCount})</span>` : '';
+            
             html += `
                 <div class="list-item" style="padding: 12px; margin-bottom: 8px;">
                     <div class="list-item-content">
                         <h4 style="margin: 0; font-size: 1rem;">${serialText}${item.parent.parentName || 'Unknown'}</h4>
                         <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">
-                            Amount: ₹${item.payment.amount}
+                            Amount: ₹${item.totalAmount}${monthsText}
                             ${isUpi ? '<span style="font-size: 0.75rem; background: #8b5cf6; color: white; padding: 2px 6px; border-radius: 12px; margin-left: 6px;">UPI ✅</span>' : ''}
                         </p>
                     </div>
