@@ -1255,7 +1255,7 @@ const App = {
         const currentMonth = getActiveMonth();
         const payments = await db.payments.where('month').equals(currentMonth).toArray();
         const allPending = await db.payments.where('status').equals('Pending').toArray();
-        const pastPending = allPending.filter(p => p.month < currentMonth);
+        const pastPending = allPending.filter(p => p.month < currentMonth && p.month >= '2026-01');
         const parents = await db.parents.toArray();
         const classes = await db.classes.toArray();
         
@@ -1699,6 +1699,9 @@ const App = {
         
         const isUploaded = !!payment.receiptUrl;
         
+        let generateReceipt = true;
+        try { const stored = await db.settings.get('generateReceipt'); if (stored !== undefined && stored !== null) generateReceipt = stored; } catch(e) {}
+        
         const content = `
             <div style="border: 1px dashed var(--border-color); padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
                 <h4 style="margin-bottom: 4px;">Madrassa Management</h4>
@@ -1744,6 +1747,9 @@ const App = {
                 <button class="btn" style="border: 1px solid var(--danger); color: var(--danger); background: transparent;" onclick="App.undoPayment('${paymentId}')">
                     <i data-lucide="undo"></i> Undo Payment
                 </button>
+                <button class="btn btn-secondary" onclick="App.editPayment('${paymentId}')">
+                    <i data-lucide="edit-2"></i> Edit Payment
+                </button>
                 <button class="btn btn-secondary" id="backToPaymentsBtn" style="border-color: var(--text-muted); color: var(--text-main);">
                     <i data-lucide="arrow-left"></i> Back
                 </button>
@@ -1764,7 +1770,7 @@ const App = {
         if (!parent) return;
 
         const allPending = await db.payments.where('status').equals('Pending').toArray();
-        const pastPending = allPending.filter(p => p.parentId === parentId && p.month < currentMonth);
+        const pastPending = allPending.filter(p => p.parentId === parentId && p.month < currentMonth && p.month >= '2026-01');
 
         // Sort by oldest month first
         pastPending.sort((a, b) => a.month.localeCompare(b.month));
