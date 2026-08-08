@@ -300,7 +300,9 @@ const App = {
         let collectedUpi = 0;
         let collectedCash = 0;
         let collectedOnline = 0;
-        let upiCount = 0;
+        
+        let uniqueParents = new Set();
+        let uniqueUpiParents = new Set();
         
         const parents = await db.parents.toArray();
 
@@ -316,9 +318,11 @@ const App = {
                 collectedBase += amt;
             }
             
+            uniqueParents.add(p.parentId);
+            
             if (p.method === 'UPI') {
                 collectedUpi += amt;
-                upiCount++;
+                uniqueUpiParents.add(p.parentId);
             } else if (p.method === 'Bank Transfer') {
                 collectedOnline += amt;
             } else {
@@ -342,9 +346,9 @@ const App = {
                         <i data-lucide="eye" style="color: white; width: 20px; height: 20px; opacity: 0.9;"></i>
                     </div>
                     <p style="color: rgba(255,255,255,0.9);">Paid Members</p>
-                    <div class="metric-value">${paymentsOnDate.length}</div>
+                    <div class="metric-value">${uniqueParents.size}</div>
                     <div style="margin-top: 8px; font-size: 0.85em; font-weight: 500; opacity: 0.9;">
-                        via UPI: ${upiCount}
+                        via UPI: ${uniqueUpiParents.size}
                     </div>
                 </div>
             </div>
