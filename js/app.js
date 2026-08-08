@@ -1663,11 +1663,19 @@ const App = {
     // --- WHATSAPP & PDF ---
     async sendBulkReminders() {
         const currentMonth = getActiveMonth();
-        const paymentsMonth = await db.payments.where('month').equals(currentMonth).toArray();
-        const payments = paymentsMonth.filter(p => p.status === 'Pending');
+        const allPendingPayments = await db.payments.where('status').equals('Pending').toArray();
+        const pendingUpToCurrent = allPendingPayments.filter(p => p.month <= currentMonth);
         
-        if(payments.length === 0) {
-            UI.showToast('No pending payments for this month!', 'info');
+        const pendingByParent = {};
+        for(const p of pendingUpToCurrent) {
+            if(!pendingByParent[p.parentId]) pendingByParent[p.parentId] = [];
+            pendingByParent[p.parentId].push(p);
+        }
+
+        const parentIdsToRemind = Object.keys(pendingByParent);
+        
+        if(parentIdsToRemind.length === 0) {
+            UI.showToast('No pending payments found!', 'info');
             return;
         }
 
@@ -1675,7 +1683,7 @@ const App = {
 
 സ്നേഹത്തോടെയുള്ള ഒരു ഓർമ്മപ്പെടുത്തൽ…
 
-{month} മാസത്തെ ഫീസ് ഇതുവരെ അടച്ചിട്ടില്ലെന്ന് ശ്രദ്ധയിൽ പെട്ടിട്ടുണ്ട്. ദയവായി സൗകര്യപ്രദമായ സമയത്ത് ഫീസ് അടക്കണമെന്ന് വിനയപൂർവ്വം ഓർമ്മിപ്പിക്കുന്നു.
+{pending_months} മാസത്തെ ഫീസ് ഇതുവരെ അടച്ചിട്ടില്ലെന്ന് ശ്രദ്ധയിൽ പെട്ടിട്ടുണ്ട്. ദയവായി സൗകര്യപ്രദമായ സമയത്ത് ഫീസ് അടക്കണമെന്ന് വിനയപൂർവ്വം ഓർമ്മിപ്പിക്കുന്നു.
 
 …جزاك الله خيرا`;
         let savedTemplate = defaultTemplate;
@@ -1698,19 +1706,31 @@ const App = {
 
         // Save data globally to regenerate the list when template changes
         window.currentPendingPayments = [];
-        for(let p of payments) {
-            const parentIndex = allParents.findIndex(x => x.id === p.parentId);
+        for(let parentId of parentIdsToRemind) {
+            const parentIndex = allParents.findIndex(x => x.id === parentId);
             const parent = allParents[parentIndex];
             if (parent) {
                 const cls = classMap[parent.classId];
                 const serial = parent.serialNo !== undefined ? parent.serialNo : (parentIndex >= 0 ? parentIndex + 1 : 999);
-                window.currentPendingPayments.push({ payment: p, parent, cls, displaySerial: serial });
+                
+                const parentPending = pendingByParent[parentId].sort((a, b) => a.month.localeCompare(b.month));
+                const pendingMonthsText = parentPending.map(p => formatMonthYear(p.month).split(' ')[0]).join(', ');
+                const primaryPayment = parentPending[parentPending.length - 1];
+
+                window.currentPendingPayments.push({ 
+                    payment: primaryPayment, 
+                    parent, 
+                    cls, 
+                    displaySerial: serial,
+                    pendingMonthsText,
+                    allPendingIds: parentPending.map(p => p.id)
+                });
             }
         }
         window.currentPendingPayments.sort((a, b) => a.displaySerial - b.displaySerial);
         
         const content = `
-            <p style="margin-bottom: 12px;">There are <strong>${payments.length}</strong> pending payments for ${formatMonthYear(currentMonth)}.</p>
+            <p style="margin-bottom: 12px;">There are <strong>${parentIdsToRemind.length}</strong> members with pending payments.</p>
             <div id="reminderQueue" style="max-height: 450px; overflow-y: auto;"></div>
         `;
         
@@ -1741,9 +1761,16 @@ const App = {
             
             let msg = template
                 .replace(/{month}/g, monthText)
+                .replace(/{pending_months}/g, item.pendingMonthsText || monthText)
                 .replace(/{parent}/g, parent.parentName)
                 .replace(/{class}/g, className)
                 .replace(/{fee}/g, parent.monthlyFee);
+                
+            // Handle Malayalam pluralization for pending months
+            if (item.allPendingIds && item.allPendingIds.length > 1) {
+                // Replaces 'മാസത്തെ' (singular) with 'മാസങ്ങളിലെ' (plural) to keep the grammar correct ("of the months")
+                msg = msg.replace(/മാസത്തെ/g, 'മാസങ്ങളിലെ');
+            }
                 
             const encodedMsg = encodeURIComponent(msg);
             const cleanPhone = String(parent.whatsappNumber || '').replace(/[^0-9]/g, '');
@@ -1785,10 +1812,19 @@ const App = {
             lucide.createIcons({ root: btnElement });
         }
         try {
-            await db.payments.update(paymentId, { reminderSent: true });
             if (window.currentPendingPayments) {
                 const item = window.currentPendingPayments.find(p => p.payment.id === paymentId);
-                if (item) item.payment.reminderSent = true;
+                if (item && item.allPendingIds) {
+                    for (const pid of item.allPendingIds) {
+                        await db.payments.update(pid, { reminderSent: true });
+                    }
+                    item.payment.reminderSent = true;
+                } else {
+                    await db.payments.update(paymentId, { reminderSent: true });
+                    if (item) item.payment.reminderSent = true;
+                }
+            } else {
+                await db.payments.update(paymentId, { reminderSent: true });
             }
             // Add slight delay before re-rendering to allow link to open
             setTimeout(() => {
@@ -1802,10 +1838,19 @@ const App = {
 
     async undoReminderSent(paymentId) {
         try {
-            await db.payments.update(paymentId, { reminderSent: false });
             if (window.currentPendingPayments) {
                 const item = window.currentPendingPayments.find(p => p.payment.id === paymentId);
-                if (item) item.payment.reminderSent = false;
+                if (item && item.allPendingIds) {
+                    for (const pid of item.allPendingIds) {
+                        await db.payments.update(pid, { reminderSent: false });
+                    }
+                    item.payment.reminderSent = false;
+                } else {
+                    await db.payments.update(paymentId, { reminderSent: false });
+                    if (item) item.payment.reminderSent = false;
+                }
+            } else {
+                await db.payments.update(paymentId, { reminderSent: false });
             }
             const template = document.getElementById('reminderTemplateInput') ? document.getElementById('reminderTemplateInput').value : (window.currentReminderTemplate || '');
             App.renderReminderQueue(template);
@@ -2045,7 +2090,7 @@ const App = {
 
 സ്നേഹത്തോടെയുള്ള ഒരു ഓർമ്മപ്പെടുത്തൽ…
 
-{month} മാസത്തെ ഫീസ് ഇതുവരെ അടച്ചിട്ടില്ലെന്ന് ശ്രദ്ധയിൽ പെട്ടിട്ടുണ്ട്. ദയവായി സൗകര്യപ്രദമായ സമയത്ത് ഫീസ് അടക്കണമെന്ന് വിനയപൂർവ്വം ഓർമ്മിപ്പിക്കുന്നു.
+{pending_months} മാസത്തെ ഫീസ് ഇതുവരെ അടച്ചിട്ടില്ലെന്ന് ശ്രദ്ധയിൽ പെട്ടിട്ടുണ്ട്. ദയവായി സൗകര്യപ്രദമായ സമയത്ത് ഫീസ് അടക്കണമെന്ന് വിനയപൂർവ്വം ഓർമ്മിപ്പിക്കുന്നു.
 
 …جزاك الله خيرا`;
         let reminderTemplate = defaultTemplate;
@@ -2072,7 +2117,7 @@ const App = {
 
             <div class="card mt-4">
                 <h3>WhatsApp Reminder Template</h3>
-                <p class="text-muted mb-4" style="font-size: 0.85rem;">Use placeholders: <code>{month}</code>, <code>{parent}</code>, <code>{class}</code>, <code>{fee}</code></p>
+                <p class="text-muted mb-4" style="font-size: 0.85rem;">Use placeholders: <code>{pending_months}</code>, <code>{month}</code>, <code>{parent}</code>, <code>{class}</code>, <code>{fee}</code></p>
                 <textarea id="reminderTemplateInput" class="form-control" rows="5" style="resize: vertical; font-size: 0.9em; margin-bottom: 12px; width: 100%;">${reminderTemplate}</textarea>
                 <button class="btn btn-primary" style="width: 100%;" onclick="App.saveReminderTemplate()">Update & Save Template</button>
             </div>
