@@ -1736,7 +1736,7 @@ const App = {
                 <hr style="border: none; border-top: 1px dashed var(--border-color); margin: 12px 0;">
                 <div class="flex justify-between" style="text-align: left; font-size: 1.1em; color: var(--success);">
                     <span>Amount Paid:</span>
-                    <strong>₹${payment.amount} (${payment.method})</strong>
+                    <strong>${Number(payment.amount) === 0 ? '₹0 (Advance Paid)' : `₹${payment.amount} (${payment.method})`}</strong>
                 </div>
             </div>
             
