@@ -1142,6 +1142,11 @@ const App = {
         UI.openModal('${App.t("Add Parent")}', content, (modal, closeFunc) => {
             modal.querySelector('#addParentForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                const originalText = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = 'Processing...';
+                
                 const fd = new FormData(e.target);
                 try {
                     const newId = await db.parents.add({
@@ -1216,6 +1221,10 @@ const App = {
         UI.openModal(App.t('Edit Parent'), content, (modal, closeFunc) => {
             modal.querySelector('#editParentForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = 'Processing...';
+                
                 const fd = new FormData(e.target);
                 try {
                     await db.parents.update(id, {
@@ -1466,6 +1475,10 @@ const App = {
         UI.openModal(`Record Payment - ${parent.parentName}`, content, (modal, closeFunc) => {
             modal.querySelector('#recordPaymentForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = 'Processing...';
+                
                 const fd = new FormData(e.target);
                 
                 try {
@@ -1581,6 +1594,10 @@ const App = {
         UI.openModal(`Edit Payment - ${parent.parentName}`, content, (modal, closeFunc) => {
             modal.querySelector('#editPaymentForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = 'Processing...';
+                
                 const fd = new FormData(e.target);
                 
                 try {
