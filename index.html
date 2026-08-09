@@ -7,7 +7,9 @@
     <title>Madrassa Fee Management</title>
     
     <!-- PWA Manifest & Icons -->
-    <link rel="manifest" id="manifest-link" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta id="apple-title" name="apple-mobile-web-app-title" content="Madrassa">
     <link rel="icon" type="image/png" href="logo-circle.png">
     <link rel="apple-touch-icon" href="logo-circle.png">
     
@@ -16,26 +18,38 @@
         (function() {
             const urlParams = new URLSearchParams(window.location.search);
             const m = urlParams.get('m');
+            let manifestTitle = "Madrassa";
+            let startUrl = "index.html";
+            
             if (m && m !== 'default') {
                 const titleName = decodeURIComponent(m).toUpperCase();
-                const manifest = {
-                    "name": "Madrassa - " + titleName,
-                    "short_name": titleName,
-                    "description": "Monthly Fee Collection Management System",
-                    "start_url": "index.html?m=" + encodeURIComponent(m),
-                    "display": "standalone",
-                    "background_color": "#ffffff",
-                    "theme_color": "#16a34a",
-                    "icons": [{
-                        "src": "logo-circle.png",
-                        "sizes": "192x192 512x512",
-                        "type": "image/png",
-                        "purpose": "any maskable"
-                    }]
-                };
-                const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
-                document.getElementById('manifest-link').href = URL.createObjectURL(blob);
+                manifestTitle = "Madrassa - " + titleName;
+                startUrl = "index.html?m=" + encodeURIComponent(m);
+                document.getElementById('apple-title').content = titleName;
+                document.title = manifestTitle;
             }
+            
+            const manifest = {
+                "name": manifestTitle,
+                "short_name": m && m !== 'default' ? decodeURIComponent(m).toUpperCase() : "Madrassa",
+                "description": "Monthly Fee Collection Management System",
+                "start_url": startUrl,
+                "display": "standalone",
+                "background_color": "#ffffff",
+                "theme_color": "#16a34a",
+                "icons": [{
+                    "src": "logo-circle.png",
+                    "sizes": "192x192 512x512",
+                    "type": "image/png",
+                    "purpose": "any maskable"
+                }]
+            };
+            const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+            
+            const manifestLink = document.createElement('link');
+            manifestLink.rel = 'manifest';
+            manifestLink.href = URL.createObjectURL(blob);
+            document.head.appendChild(manifestLink);
         })();
     </script>
     
@@ -45,7 +59,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- CSS -->
-    <link rel="stylesheet" href="css/app.css?v=61">
+    <link rel="stylesheet" href="css/app.css?v=62">
     
     <!-- CDNs -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -91,9 +105,9 @@
     <div id="toast-container"></div>
 
     <!-- App Scripts -->
-    <script src="js/db.js?v=67"></script>
-    <script src="js/ui.js?v=67"></script>
-    <script src="js/app.js?v=67"></script>
+    <script src="js/db.js?v=68"></script>
+    <script src="js/ui.js?v=68"></script>
+    <script src="js/app.js?v=68"></script>
     
     <script>
         // Initialize Lucide icons
