@@ -1907,6 +1907,14 @@ const App = {
         UI.showToast('Template saved successfully!');
     },
 
+    async resetReminderTemplate() {
+        const defaultTemplate = `السلام عليكم ورحمة الله وبركاته \n\nസ്നേഹത്തോടെയുള്ള ഒരു ഓർമ്മപ്പെടുത്തൽ…\n\n{pending_months} {month_word} ഫീസ് ഇതുവരെ അടച്ചിട്ടില്ലെന്ന് ശ്രദ്ധയിൽ പെട്ടിട്ടുണ്ട്. ദയവായി സൗകര്യപ്രദമായ സമയത്ത് ഫീസ് അടക്കണമെന്ന് വിനയപൂർവ്വം ഓർമ്മിപ്പിക്കുന്നു.\n\n…جزاك الله خيرا`;
+        const el = document.getElementById('reminderTemplateInput');
+        if(el) el.value = defaultTemplate;
+        await db.settings.set('reminderTemplate', defaultTemplate);
+        UI.showToast('Template reset to default!');
+    },
+
     renderReminderQueue(template) {
         const queueContainer = document.getElementById('reminderQueue');
         if(!queueContainer) return;
@@ -1930,8 +1938,12 @@ const App = {
                 .replace(/{fee}/g, parent.monthlyFee);
                 
             // Handle Malayalam pluralization for pending months
+            const monthWord = (item.allPendingIds && item.allPendingIds.length > 1) ? 'മാസങ്ങളിലെ' : 'മാസത്തെ';
+            msg = msg.replace(/{month_word}/g, monthWord);
+            
             if (item.allPendingIds && item.allPendingIds.length > 1) {
                 // Replaces 'മാസത്തെ' (singular) with 'മാസങ്ങളിലെ' (plural) to keep the grammar correct ("of the months")
+                // (Fallback for backward compatibility if {month_word} is not used)
                 msg = msg.replace(/മാസത്തെ/g, 'മാസങ്ങളിലെ');
             }
                 
@@ -2255,7 +2267,7 @@ const App = {
 
 സ്നേഹത്തോടെയുള്ള ഒരു ഓർമ്മപ്പെടുത്തൽ…
 
-{pending_months} മാസത്തെ ഫീസ് ഇതുവരെ അടച്ചിട്ടില്ലെന്ന് ശ്രദ്ധയിൽ പെട്ടിട്ടുണ്ട്. ദയവായി സൗകര്യപ്രദമായ സമയത്ത് ഫീസ് അടക്കണമെന്ന് വിനയപൂർവ്വം ഓർമ്മിപ്പിക്കുന്നു.
+{pending_months} {month_word} ഫീസ് ഇതുവരെ അടച്ചിട്ടില്ലെന്ന് ശ്രദ്ധയിൽ പെട്ടിട്ടുണ്ട്. ദയവായി സൗകര്യപ്രദമായ സമയത്ത് ഫീസ് അടക്കണമെന്ന് വിനയപൂർവ്വം ഓർമ്മിപ്പിക്കുന്നു.
 
 …جزاك الله خيرا`;
         let reminderTemplate = defaultTemplate;
@@ -2285,9 +2297,12 @@ const App = {
 
             <div class="card mt-4">
                 <h3>WhatsApp Reminder Template</h3>
-                <p class="text-muted mb-4" style="font-size: 0.85rem;">Use placeholders: <code>{pending_months}</code>, <code>{month}</code>, <code>{parent}</code>, <code>{class}</code>, <code>{fee}</code></p>
+                <p class="text-muted mb-4" style="font-size: 0.85rem;">Use placeholders: <code>{pending_months}</code>, <code>{month_word}</code>, <code>{month}</code>, <code>{parent}</code>, <code>{class}</code>, <code>{fee}</code></p>
                 <textarea id="reminderTemplateInput" class="form-control" rows="5" style="resize: vertical; font-size: 0.9em; margin-bottom: 12px; width: 100%;">${reminderTemplate}</textarea>
-                <button class="btn btn-primary" style="width: 100%;" onclick="App.saveReminderTemplate()">Update & Save Template</button>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-primary" style="flex: 1;" onclick="App.saveReminderTemplate()">Update & Save</button>
+                    <button class="btn btn-secondary" style="flex: 1;" onclick="if(confirm('Reset to default Malayalam template?')) App.resetReminderTemplate()">Reset to Default</button>
+                </div>
             </div>
 
             ${generateReceipt ? `
