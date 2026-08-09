@@ -97,6 +97,13 @@ const App = {
         UI.showToast(value ? 'Receipt Generation Enabled' : 'Receipt Generation Disabled');
     },
 
+    async saveSystemStartMonth(value) {
+        if(!value) return;
+        await db.settings.set('systemStartMonth', value);
+        await generateMonthlyRecords(); // regenerate records based on new start month
+        UI.showToast('Start Month Updated');
+    },
+
     toggleAppPrefsLock() {
         if (window.isAppPrefsUnlocked) {
             window.isAppPrefsUnlocked = false;
@@ -1251,7 +1258,8 @@ const App = {
         const currentMonth = getActiveMonth();
         const payments = await db.payments.where('month').equals(currentMonth).toArray();
         const allPending = await db.payments.where('status').equals('Pending').toArray();
-        const pastPending = allPending.filter(p => p.month < currentMonth && p.month >= '2026-01');
+        const startMonth = await getSystemStartMonth();
+        const pastPending = allPending.filter(p => p.month < currentMonth && p.month >= startMonth);
         const parents = await db.parents.toArray();
         const classes = await db.classes.toArray();
         
@@ -1766,7 +1774,8 @@ const App = {
         if (!parent) return;
 
         const allPending = await db.payments.where('status').equals('Pending').toArray();
-        const pastPending = allPending.filter(p => p.parentId === parentId && p.month < currentMonth && p.month >= '2026-01');
+        const startMonth = await getSystemStartMonth();
+        const pastPending = allPending.filter(p => p.parentId === parentId && p.month < currentMonth && p.month >= startMonth);
 
         // Sort by oldest month first
         pastPending.sort((a, b) => a.month.localeCompare(b.month));
@@ -1838,7 +1847,10 @@ const App = {
         let savedTemplate = defaultTemplate;
         try {
             const stored = await db.settings.get('reminderTemplate');
-            if (stored) savedTemplate = typeof stored === 'object' ? (stored.value || defaultTemplate) : stored;
+            if (stored) {
+                savedTemplate = typeof stored === 'object' ? (stored.value || defaultTemplate) : stored;
+                savedTemplate = savedTemplate.replace(/\{months\}/g, '{pending_months}');
+            }
         } catch(e) {}
 
         // Fetch all parents and classes once concurrently for speed
@@ -1911,6 +1923,7 @@ const App = {
             let msg = template
                 .replace(/{month}/g, monthText)
                 .replace(/{pending_months}/g, item.pendingMonthsText || monthText)
+                .replace(/{months}/g, item.pendingMonthsText || monthText)
                 .replace(/{parent}/g, parent.parentName)
                 .replace(/{class}/g, className)
                 .replace(/{fee}/g, parent.monthlyFee);
@@ -2235,6 +2248,8 @@ const App = {
         let generateReceipt = true;
         try { const stored = await db.settings.get('generateReceipt'); if (stored !== undefined && stored !== null) generateReceipt = stored; } catch(e) {}
 
+        const systemStartMonth = await getSystemStartMonth();
+
         let defaultTemplate = `السلام عليكم ورحمة الله وبركاته 
 
 സ്നേഹത്തോടെയുള്ള ഒരു ഓർമ്മപ്പെടുത്തൽ…
@@ -2245,7 +2260,10 @@ const App = {
         let reminderTemplate = defaultTemplate;
         try {
             const stored = await db.settings.get('reminderTemplate');
-            if (stored) reminderTemplate = typeof stored === 'object' ? (stored.value || defaultTemplate) : stored;
+            if (stored) {
+                reminderTemplate = typeof stored === 'object' ? (stored.value || defaultTemplate) : stored;
+                reminderTemplate = reminderTemplate.replace(/\{months\}/g, '{pending_months}');
+            }
         } catch(e) {}
 
         container.innerHTML = `
@@ -2312,6 +2330,10 @@ const App = {
                                 <span style="position: absolute; content: ''; height: 18px; width: 18px; left: ${useMembersTerminology ? '23px' : '3px'}; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%;"></span>
                             </span>
                         </label>
+                    </div>
+                    <div class="flex justify-between align-center mt-2" style="margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                        <span style="font-weight: 500;">System Start Month</span>
+                        <input type="month" class="form-control" style="width: auto; padding: 4px 8px; font-size: 0.9em;" value="${systemStartMonth}" onchange="App.saveSystemStartMonth(this.value)">
                     </div>
                     <div class="flex justify-between align-center mt-2">
                         <span style="font-weight: 500;">Generate Receipt</span>

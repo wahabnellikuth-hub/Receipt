@@ -119,7 +119,9 @@ const db = {
                         toArray: async () => {
                             const snap = await database.ref(getDbPath('payments')).orderByChild(field).equalTo(value).once('value');
                             const val = snap.val() || {};
-                            return Object.keys(val).map(k => ({id: String(k), ...val[k]}));
+                            return Object.keys(val)
+                                .map(k => ({id: String(k), ...val[k]}))
+                                .filter(item => item[field] === value);
                         },
                         count: async () => {
                             const arr = await this.toArray();
@@ -176,19 +178,31 @@ function setActiveMonth(monthStr) {
     localStorage.setItem('activeMonth', monthStr);
 }
 
+async function getSystemStartMonth() {
+    let startMonth = '2026-01';
+    try {
+        const stored = await db.settings.get('systemStartMonth');
+        if (stored) startMonth = stored;
+    } catch(e) {}
+    return startMonth;
+}
+
 // Ensure all parents have a payment record for the current month
 async function generateMonthlyRecords() {
     const currentMonth = getActiveMonth();
+    const startMonth = await getSystemStartMonth();
     
-    // Determine the range of months from 2026-01 to currentMonth
+    // Determine the range of months from startMonth to currentMonth
     let endY = parseInt(currentMonth.substring(0, 4));
     let endM = parseInt(currentMonth.substring(5, 7));
     
-    // Ensure we don't go backwards if currentMonth is somehow before 2026 (edge case)
-    if (endY < 2026) return;
+    let cy = parseInt(startMonth.substring(0, 4));
+    let cm = parseInt(startMonth.substring(5, 7));
+    
+    // Ensure we don't go backwards if currentMonth is somehow before startMonth
+    if (endY < cy || (endY === cy && endM < cm)) return;
     
     const months = [];
-    let cy = 2026, cm = 1;
     while (cy < endY || (cy === endY && cm <= endM)) {
         months.push(`${cy}-${String(cm).padStart(2, '0')}`);
         cm++;
