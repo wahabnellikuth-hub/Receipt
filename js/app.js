@@ -1688,12 +1688,8 @@ const App = {
     async openWhatsApp(paymentId) {
         const payment = await db.payments.get(paymentId);
         const parent = await db.parents.get(payment.parentId);
-        
-        await db.payments.update(paymentId, { textSent: true, receiptSent: true });
-        const activeNav = document.querySelector('.nav-item.active');
-        if (activeNav) App.renderPage(activeNav.dataset.target);
-        
-        window.open(`https://wa.me/${parent.whatsappNumber}`, '_blank');
+        const cleanPhone = String(parent.whatsappNumber || '').replace(/[^0-9]/g, '');
+        window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}`, '_blank');
     },
 
     async viewReceipt(paymentId) {
@@ -1968,7 +1964,7 @@ const App = {
                             <i data-lucide="undo" style="width: 16px; height: 16px; margin: 0;"></i>
                         </button>
                         ` : ''}
-                        <a href="https://wa.me/${cleanPhone}?text=${encodedMsg}" target="_blank" class="btn" style="width: auto; padding: 8px 16px; background: ${isSent ? 'var(--text-muted)' : '#25D366'}; color: white; border-radius: 8px; border: none; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;" onclick="App.markReminderSent('${payment.id}', this);">
+                        <a href="https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}" target="_blank" class="btn" style="width: auto; padding: 8px 16px; background: ${isSent ? 'var(--text-muted)' : '#25D366'}; color: white; border-radius: 8px; border: none; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;" onclick="App.markReminderSent('${payment.id}', this);">
                             <i data-lucide="${isSent ? 'check' : 'send'}" style="width: 16px; height: 16px;"></i> ${isSent ? 'Send Again' : 'Send'}
                         </a>
                     </div>
