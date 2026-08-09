@@ -1981,7 +1981,7 @@ const App = {
                             <i data-lucide="undo" style="width: 16px; height: 16px; margin: 0;"></i>
                         </button>
                         ` : ''}
-                        <button type="button" class="btn" style="width: auto; padding: 8px 16px; background: ${isSent ? 'var(--text-muted)' : '#25D366'}; color: white; border-radius: 8px; border: none; display: inline-flex; align-items: center; gap: 8px;" onclick="App.sendWhatsAppMessage('${payment.id}', '${cleanPhone}', decodeURIComponent('${encodedMsg}'), this);">
+                        <button type="button" class="btn" style="width: auto; padding: 8px 16px; background: ${isSent ? 'var(--text-muted)' : '#25D366'}; color: white; border-radius: 8px; border: none; display: inline-flex; align-items: center; gap: 8px;" data-phone="${cleanPhone}" data-encoded-text="${encodedMsg}" data-id="${payment.id}" onclick="App.sendWhatsAppMessage(this);">
                             <i data-lucide="${isSent ? 'check' : 'send'}" style="width: 16px; height: 16px;"></i> ${isSent ? 'Send Again' : 'Send'}
                         </button>
                     </div>
@@ -1992,14 +1992,21 @@ const App = {
         lucide.createIcons({root: queueContainer});
     },
 
-    sendWhatsAppMessage(paymentId, phone, text, btnElement) {
-        const encodedMsg = encodeURIComponent(text);
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    sendWhatsAppMessage(btnElement) {
+        const phone = btnElement.getAttribute('data-phone');
+        const encodedMsg = btnElement.getAttribute('data-encoded-text');
+        const paymentId = btnElement.getAttribute('data-id');
+        
+        const isAndroid = /Android/i.test(navigator.userAgent);
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
         
         let url = '';
-        if (isMobile) {
-            // Direct app intent for mobile to prevent PWA webviews from dropping the text parameter
+        if (isAndroid) {
+            // Direct app intent for Android to prevent PWA webviews from dropping the text parameter
             url = `whatsapp://send?phone=${phone}&text=${encodedMsg}`;
+        } else if (isIOS) {
+            // Universal Link for iOS. Deep links (whatsapp://) drop text on subsequent clicks if app is in background on iOS.
+            url = `https://wa.me/${phone}?text=${encodedMsg}`;
         } else {
             // Standard web link for desktop
             url = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedMsg}`;
