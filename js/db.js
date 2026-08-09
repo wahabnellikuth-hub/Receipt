@@ -46,9 +46,28 @@ function getDbPath(path) {
     return `madrasas/${madrasaId}/${path}`;
 }
 
+const memCache = {
+    classes: null,
+    parents: null,
+    payments: null,
+    settings: null,
+    isListening: false
+};
+
+function startCacheListeners() {
+    if (memCache.isListening) return;
+    memCache.isListening = true;
+    
+    database.ref(getDbPath('classes')).on('value', snap => memCache.classes = snap.val() || {});
+    database.ref(getDbPath('parents')).on('value', snap => memCache.parents = snap.val() || {});
+    database.ref(getDbPath('payments')).on('value', snap => memCache.payments = snap.val() || {});
+    database.ref(getDbPath('settings')).on('value', snap => memCache.settings = snap.val() || {});
+}
+
 // Facade to mimic Dexie API for app.js
 const db = {
     open: async () => {
+        startCacheListeners();
         // Seed Initial Data (if classes are empty)
         try {
             const snap = await database.ref(getDbPath('classes')).once('value');
@@ -65,6 +84,7 @@ const db = {
     
     classes: {
         toArray: async () => {
+            if (memCache.classes !== null) return Object.keys(memCache.classes).map(k => ({id: String(k), ...memCache.classes[k]}));
             const snap = await database.ref(getDbPath('classes')).once('value');
             const val = snap.val() || {};
             return Object.keys(val).map(k => ({id: String(k), ...val[k]}));
@@ -74,6 +94,7 @@ const db = {
             return arr.length;
         },
         get: async (id) => {
+            if (memCache.classes !== null && memCache.classes[id]) return {id: String(id), ...memCache.classes[id]};
             const snap = await database.ref(getDbPath(`classes/${id}`)).once('value');
             return snap.exists() ? {id: String(id), ...snap.val()} : null;
         }
@@ -81,6 +102,7 @@ const db = {
 
     parents: {
         toArray: async () => {
+            if (memCache.parents !== null) return Object.keys(memCache.parents).map(k => ({id: String(k), ...memCache.parents[k]}));
             const snap = await database.ref(getDbPath('parents')).once('value');
             const val = snap.val() || {};
             return Object.keys(val).map(k => ({id: String(k), ...val[k]}));
@@ -90,6 +112,7 @@ const db = {
             return arr.length;
         },
         get: async (id) => {
+            if (memCache.parents !== null && memCache.parents[id]) return {id: String(id), ...memCache.parents[id]};
             const snap = await database.ref(getDbPath(`parents/${id}`)).once('value');
             return snap.exists() ? {id: String(id), ...snap.val()} : null;
         },
@@ -108,6 +131,7 @@ const db = {
 
     payments: {
         toArray: async () => {
+            if (memCache.payments !== null) return Object.keys(memCache.payments).map(k => ({id: String(k), ...memCache.payments[k]}));
             const snap = await database.ref(getDbPath('payments')).once('value');
             const val = snap.val() || {};
             return Object.keys(val).map(k => ({id: String(k), ...val[k]}));
@@ -117,6 +141,11 @@ const db = {
                 equals: function(value) {
                     return {
                         toArray: async () => {
+                            if (memCache.payments !== null) {
+                                return Object.keys(memCache.payments)
+                                    .map(k => ({id: String(k), ...memCache.payments[k]}))
+                                    .filter(item => item[field] === value);
+                            }
                             const snap = await database.ref(getDbPath('payments')).orderByChild(field).equalTo(value).once('value');
                             const val = snap.val() || {};
                             return Object.keys(val)
@@ -132,6 +161,7 @@ const db = {
             }
         },
         get: async (id) => {
+            if (memCache.payments !== null && memCache.payments[id]) return {id: String(id), ...memCache.payments[id]};
             const snap = await database.ref(getDbPath(`payments/${id}`)).once('value');
             return snap.exists() ? {id: String(id), ...snap.val()} : null;
         },
@@ -154,6 +184,7 @@ const db = {
 
     settings: {
         get: async (key) => {
+            if (memCache.settings !== null && memCache.settings[key] !== undefined) return memCache.settings[key];
             const snap = await database.ref(getDbPath(`settings/${key}`)).once('value');
             return snap.val();
         },
