@@ -1981,15 +1981,32 @@ const App = {
                             <i data-lucide="undo" style="width: 16px; height: 16px; margin: 0;"></i>
                         </button>
                         ` : ''}
-                        <a href="https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}" target="_blank" class="btn" style="width: auto; padding: 8px 16px; background: ${isSent ? 'var(--text-muted)' : '#25D366'}; color: white; border-radius: 8px; border: none; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;" onclick="App.markReminderSent('${payment.id}', this);">
+                        <button type="button" class="btn" style="width: auto; padding: 8px 16px; background: ${isSent ? 'var(--text-muted)' : '#25D366'}; color: white; border-radius: 8px; border: none; display: inline-flex; align-items: center; gap: 8px;" onclick="App.sendWhatsAppMessage('${payment.id}', '${cleanPhone}', decodeURIComponent('${encodedMsg}'), this);">
                             <i data-lucide="${isSent ? 'check' : 'send'}" style="width: 16px; height: 16px;"></i> ${isSent ? 'Send Again' : 'Send'}
-                        </a>
+                        </button>
                     </div>
                 </div>
             `;
         }
         queueContainer.innerHTML = html;
         lucide.createIcons({root: queueContainer});
+    },
+
+    sendWhatsAppMessage(paymentId, phone, text, btnElement) {
+        const encodedMsg = encodeURIComponent(text);
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        let url = '';
+        if (isMobile) {
+            // Direct app intent for mobile to prevent PWA webviews from dropping the text parameter
+            url = `whatsapp://send?phone=${phone}&text=${encodedMsg}`;
+        } else {
+            // Standard web link for desktop
+            url = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedMsg}`;
+        }
+        
+        window.open(url, '_blank');
+        this.markReminderSent(paymentId, btnElement);
     },
 
     async markReminderSent(paymentId, btnElement) {
