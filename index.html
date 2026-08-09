@@ -7,9 +7,37 @@
     <title>Madrassa Fee Management</title>
     
     <!-- PWA Manifest & Icons -->
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" id="manifest-link" href="manifest.json">
     <link rel="icon" type="image/png" href="logo-circle.png">
     <link rel="apple-touch-icon" href="logo-circle.png">
+    
+    <script>
+        // Dynamic PWA Manifest generation for multi-tenancy
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const m = urlParams.get('m');
+            if (m && m !== 'default') {
+                const titleName = decodeURIComponent(m).toUpperCase();
+                const manifest = {
+                    "name": "Madrassa - " + titleName,
+                    "short_name": titleName,
+                    "description": "Monthly Fee Collection Management System",
+                    "start_url": "index.html?m=" + encodeURIComponent(m),
+                    "display": "standalone",
+                    "background_color": "#ffffff",
+                    "theme_color": "#16a34a",
+                    "icons": [{
+                        "src": "logo-circle.png",
+                        "sizes": "192x192 512x512",
+                        "type": "image/png",
+                        "purpose": "any maskable"
+                    }]
+                };
+                const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+                document.getElementById('manifest-link').href = URL.createObjectURL(blob);
+            }
+        })();
+    </script>
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
