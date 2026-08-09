@@ -432,8 +432,8 @@ const App = {
         let months = [];
         let [endY, endM] = activeMonth.split('-').map(Number);
         
-        let curY = 2026;
-        let curM = 1;
+        const startMonth = await getSystemStartMonth();
+        let [curY, curM] = startMonth.split('-').map(Number);
         while (curY < endY || (curY === endY && curM <= endM)) {
             months.push(`${curY}-${String(curM).padStart(2, '0')}`);
             curM++;
@@ -519,8 +519,8 @@ const App = {
         
         let months = [];
         let [endY, endM] = activeMonth.split('-').map(Number);
-        let curY = 2026;
-        let curM = 1;
+        const startMonth = await getSystemStartMonth();
+        let [curY, curM] = startMonth.split('-').map(Number);
         while (curY < endY || (curY === endY && curM <= endM)) {
             months.push(`${curY}-${String(curM).padStart(2, '0')}`);
             curM++;
@@ -1821,8 +1821,9 @@ const App = {
     // --- WHATSAPP & PDF ---
     async sendBulkReminders() {
         const currentMonth = getActiveMonth();
+        const startMonth = await getSystemStartMonth();
         const allPendingPayments = await db.payments.where('status').equals('Pending').toArray();
-        const pendingUpToCurrent = allPendingPayments.filter(p => p.month <= currentMonth);
+        const pendingUpToCurrent = allPendingPayments.filter(p => p.month <= currentMonth && p.month >= startMonth);
         
         const pendingByParent = {};
         for(const p of pendingUpToCurrent) {
